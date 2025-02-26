@@ -1,0 +1,677 @@
+import os
+import yaml
+from functools import partial
+
+import numpy as np
+import pandas as pd
+import torch
+from torch.nn import functional as F
+import dgl
+
+from sklearn.preprocessing import (FunctionTransformer, StandardScaler, MinMaxScaler, RobustScaler, PowerTransformer,
+                                   QuantileTransformer, OneHotEncoder)
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import average_precision_score, r2_score
+from sklearn.model_selection import train_test_split
+
+from torch_geometric import datasets as pyg_datasets
+from ogb.nodeproppred import NodePropPredDataset
+
+
+class Dataset:
+    # Datasets by source.
+    # Automatic downloading is currently not supported for TabGraphs datasets. If you want to use one of these datasets,
+    # put it in the data directory.
+    tabgraphs_old_datasets_names = ['tolokers-tab-old', 'questions-tab-old', 'city-reviews-old', 'browser-games-old',
+                                    'hm-categories-old', 'web-fraud-old', 'city-roads-M-old', 'city-roads-L-old',
+                                    'avazu-devices-old', 'hm-prices-old', 'web-traffic-old']
+    tabgraphs_transductive_datasets_names = ['games-categories-TR', 'games-categories-TT', 'games-ctr-TR',
+                                             'games-ctr-TT', 'hm-prices-TR', 'hm-prices-TT', 'avazu-devices-TR',
+                                             'avazu-devices-TT', 'city-reviews-TR', 'city-reviews-TT',
+                                             'city-roads-M-TR', 'city-roads-L-TR']
+    tabgraphs_inductive_datasets_names = ['games-categories-I', 'games-ctr-I', 'hm-prices-I', 'avazu-devices-I',
+                                          'city-reviews-I']
+    pyg_datasets_names = ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer',
+                          'pubmed', 'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo',
+                          'lastfm-asia', 'facebook']
+    ogb_datasets_names = ['ogbn-arxiv', 'ogbn-products']
+
+    # Datasets by task.
+    multiclass_classification_datasets_names = ['games-categories-TR', 'games-categories-TT', 'games-categories-I',
+                                                'browser-games-old', 'hm-categories-old', 'roman-empire',
+                                                'amazon-ratings', 'cora', 'citeseer', 'pubmed', 'coauthor-cs',
+                                                'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia',
+                                                'facebook', 'ogbn-arxiv', 'ogbn-products']
+    binary_classification_datasets_names = ['city-reviews-TR', 'city-reviews-TT', 'city-reviews-I', 'tolokers-tab-old',
+                                            'questions-tab-old', 'city-reviews-old', 'web-fraud-old', 'minesweeper',
+                                            'tolokers', 'questions']
+    regression_datasets_names = ['games-ctr-TR', 'games-ctr-TT', 'games-ctr-I', 'hm-prices-TR', 'hm-prices-TT',
+                                 'hm-prices-I', 'avazu-devices-TR', 'avazu-devices-TT', 'avazu-devices-I',
+                                 'city-roads-M-TR', 'city-roads-L-TR', 'city-roads-M-old', 'city-roads-L-old',
+                                 'avazu-devices-old', 'hm-prices-old', 'web-traffic-old']
+
+    # Not all datasets obtained from PyG have predefined data splits. Random class stratified splits will be used for
+    # other datasets.
+    pyg_datasets_with_predefined_splits_names = ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers',
+                                                 'questions']
+
+    transforms = {
+        'none': partial(FunctionTransformer, func=lambda x: x, inverse_func=lambda x: x),
+        'standard-scaler': partial(StandardScaler, copy=False),
+        'min-max-scaler': partial(MinMaxScaler, clip=False, copy=False),
+        'robust-scaler': partial(RobustScaler, copy=False),
+        'power-transform-yeo-johnson': partial(PowerTransformer, method='yeo-johnson', standardize=True, copy=False),
+        'quantile-transform-normal': partial(QuantileTransformer, output_distribution='normal', subsample=None,
+                                             random_state=0, copy=False),
+        'quantile-transform-uniform': partial(QuantileTransformer, output_distribution='uniform', subsample=None,
+                                              random_state=0, copy=False)
+    }
+
+    def __init__(self, name, add_self_loops=False, use_node_embeddings=False,
+                 numerical_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
+                 regression_targets_transform='none', device='cpu'):
+        print('Preparing data...')
+        if name in self.tabgraphs_old_datasets_names:
+            graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
+                self.get_tabgraphs_old_dataset(name=name, add_self_loops=add_self_loops,
+                                               use_node_embeddings=use_node_embeddings)
+            transductive = True
+
+        elif name in self.tabgraphs_transductive_datasets_names:
+            graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
+                self.get_tabgraphs_transductive_dataset(name=name, add_self_loops=add_self_loops,
+                                                        use_node_embeddings=use_node_embeddings)
+            transductive = True
+
+        elif name in self.tabgraphs_inductive_datasets_names:
+            (train_graph, train_features, train_targets, train_mask,
+             val_graph, val_features, val_targets, val_mask, test_graph,
+             test_features, test_targets, test_mask, numerical_features_mask) = \
+                self.get_tabgraphs_inductive_dataset(name=name, add_self_loops=add_self_loops,
+                                                     use_node_embeddings=use_node_embeddings)
+            transductive = False
+
+        elif name in self.pyg_datasets_names:
+            graph, features, targets, train_mask, val_mask, test_mask = self.get_pyg_dataset(
+                name=name, add_self_loops=add_self_loops
+            )
+            numerical_features_mask = None
+            transductive = True
+
+        elif name in self.ogb_datasets_names:
+            graph, features, targets, train_mask, val_mask, test_mask = self.get_ogb_dataset(
+                name=name, add_self_loops=add_self_loops
+            )
+            numerical_features_mask = None
+            transductive = True
+
+        else:
+            raise ValueError(f'Unkown dataset name: {name}.')
+
+        if name in self.multiclass_classification_datasets_names:
+            task = 'multiclass_classification'
+            metric_name = 'accuracy'
+            loss_fn = F.cross_entropy
+            if transductive:
+                targets_dim = len(targets.unique())
+                targets = targets.to(torch.int64)
+            else:
+                targets_dim = len(train_targets.unique())
+                train_targets = train_targets.to(torch.int64)
+                val_targets = val_targets.to(torch.int64)
+                test_targets = test_targets.to(torch.int64)
+
+        elif name in self.binary_classification_datasets_names:
+            task = 'binary_classification'
+            metric_name = 'AP'
+            loss_fn = F.binary_cross_entropy_with_logits
+            targets_dim = 1
+            if transductive:
+                targets = targets.to(torch.float32)
+            else:
+                train_targets = train_targets.to(torch.float32)
+                val_targets = val_targets.to(torch.float32)
+                test_targets = test_targets.to(torch.float32)
+
+        elif name in self.regression_datasets_names:
+            task = 'regression'
+            metric_name = 'R2'
+            loss_fn = F.mse_loss
+            targets_dim = 1
+
+        else:
+            raise RuntimeError(f'The task for dataset {name} is not known.')
+
+        self.name = name
+        self.task = task
+        self.metric_name = metric_name
+        self.loss_fn = loss_fn
+        self.transductive = transductive
+        self.device = device
+
+        if transductive:
+            self.graph = graph.to(device)
+            self.features = features.to(device)
+            self.targets = targets.to(device)
+            self.train_mask = train_mask.to(device)
+            self.val_mask = val_mask.to(device)
+            self.test_mask = test_mask.to(device)
+
+        else:
+            self.train_graph = train_graph.to(device)
+            self.train_features = train_features.to(device)
+            self.train_targets = train_targets.to(device)
+            self.train_mask = train_mask.to(device)
+
+            self.val_graph = val_graph.to(device)
+            self.val_features = val_features.to(device)
+            self.val_targets = val_targets.to(device)
+            self.val_mask = val_mask.to(device)
+
+            self.test_graph = test_graph.to(device)
+            self.test_features = test_features.to(device)
+            self.test_targets = test_targets.to(device)
+            self.test_mask = test_mask.to(device)
+
+        self.features_dim = features.shape[1] if transductive else train_features.shape[1]
+        self.targets_dim = targets_dim
+
+        if task == 'regression':
+            self.regression_targets_transform_name = None
+            self.regression_targets_transform = None
+            if transductive:
+                self.targets_orig = targets.clone().numpy()
+            else:
+                self.train_targets_orig = train_targets.clone().numpy()
+                self.val_targets_orig = val_targets.clone().numpy()
+                self.test_targets_orig = test_targets.clone().numpy()
+
+        if numerical_features_mask is None:
+            self.numerical_features_mask = None
+        else:
+            self.numerical_features_mask = numerical_features_mask.to(device)
+            self.numerical_features_transform_name = None
+            self.numerical_features_nan_imputation_strategy = None
+            if transductive:
+                self.numerical_features_orig = features[:, numerical_features_mask].clone().numpy()
+            else:
+                self.train_numerical_features_orig = train_features[:, numerical_features_mask].clone().numpy()
+                self.val_numerical_features_orig = val_features[:, numerical_features_mask].clone().numpy()
+                self.test_numerical_features_orig = test_features[:, numerical_features_mask].clone().numpy()
+
+        self.apply_transforms(regression_targets_transform_name=regression_targets_transform,
+                              numerical_features_transform_name=numerical_features_transform,
+                              numerical_features_nan_imputation_strategy=numerical_features_nan_imputation_strategy)
+
+    def apply_transforms(self, regression_targets_transform_name, numerical_features_transform_name,
+                         numerical_features_nan_imputation_strategy):
+        if self.task == 'regression' and regression_targets_transform_name != self.regression_targets_transform_name:
+            regression_targets_transform = self.transforms[regression_targets_transform_name]()
+            if self.transductive:
+                regression_targets_transform.fit(self.targets_orig[:, None])
+                targets = regression_targets_transform.transform(self.targets_orig.copy()[:, None]).squeeze(1)
+                self.targets = torch.tensor(targets, device=self.device)
+            else:
+                regression_targets_transform.fit(self.train_targets_orig[:, None])
+                train_targets = regression_targets_transform.transform(
+                    self.train_targets_orig.copy()[:, None]
+                ).squeeze(1)
+                val_targets = regression_targets_transform.transform(
+                    self.val_targets_orig.copy()[:, None]
+                ).squeeze(1)
+                test_targets = regression_targets_transform.transform(
+                    self.test_targets_orig.copy()[:, None]
+                ).squeeze(1)
+                self.train_targets = torch.tensor(train_targets, device=self.device)
+                self.val_targets = torch.tensor(val_targets, device=self.device)
+                self.test_targets = torch.tensor(test_targets, device=self.device)
+
+            self.regression_targets_transform_name = regression_targets_transform_name
+            self.regression_targets_transform = regression_targets_transform
+
+        if (
+                self.numerical_features_mask is not None and
+                (
+                        numerical_features_transform_name != self.numerical_features_transform_name or
+                        numerical_features_nan_imputation_strategy != self.numerical_features_nan_imputation_strategy
+                )
+        ):
+            numerical_features_transform = self.transforms[numerical_features_transform_name]()
+            numerical_features_imputer = SimpleImputer(missing_values=np.nan,
+                                                       strategy=numerical_features_nan_imputation_strategy,
+                                                       copy=False)
+
+            if self.transductive:
+                numerical_features_transform.fit(self.numerical_features_orig)
+                numerical_features = numerical_features_transform.transform(self.numerical_features_orig.copy())
+
+                if np.isnan(numerical_features).any():
+                    numerical_features_imputer.fit(numerical_features)
+                    numerical_features = numerical_features_imputer.transform(numerical_features)
+
+                self.features[:, self.numerical_features_mask] = torch.tensor(numerical_features, device=self.device)
+
+            else:
+                numerical_features_transform.fit(self.train_numerical_features_orig)
+                train_numerical_features = numerical_features_transform.transform(
+                    self.train_numerical_features_orig.copy()
+                )
+                val_numerical_features = numerical_features_transform.transform(
+                    self.val_numerical_features_orig.copy()
+                )
+                test_numerical_features = numerical_features_transform.transform(
+                    self.test_numerical_features_orig.copy()
+                )
+
+                if (
+                        np.isnan(train_numerical_features).any() or
+                        np.isnan(val_numerical_features).any() or
+                        np.isnan(test_numerical_features).any()
+                ):
+                    numerical_features_imputer.fit(train_numerical_features)
+                    train_numerical_features = numerical_features_imputer.transform(train_numerical_features)
+                    val_numerical_features = numerical_features_imputer.transform(val_numerical_features)
+                    test_numerical_features = numerical_features_imputer.transform(test_numerical_features)
+
+                self.train_features[:, self.numerical_features_mask] = torch.tensor(
+                    train_numerical_features, device=self.device
+                )
+                self.val_features[:, self.numerical_features_mask] = torch.tensor(
+                    val_numerical_features, device=self.device
+                )
+                self.test_features[:, self.numerical_features_mask] = torch.tensor(
+                    test_numerical_features, device=self.device
+                )
+
+            self.numerical_features_transform_name = numerical_features_transform_name
+            self.numerical_features_nan_imputation_strategy = numerical_features_nan_imputation_strategy
+
+    def apply_transforms_from_args(self, args):
+        self.apply_transforms(
+            regression_targets_transform_name=args.regression_targets_transform,
+            numerical_features_transform_name=args.numerical_features_transform,
+            numerical_features_nan_imputation_strategy=args.numerical_features_nan_imputation_strategy
+        )
+
+    def compute_metrics_transductive(self, preds):
+        if self.metric_name == 'accuracy':
+            preds = preds.argmax(axis=1)
+            train_metric = (preds[self.train_mask] == self.targets[self.train_mask]).float().mean().item()
+            val_metric = (preds[self.val_mask] == self.targets[self.val_mask]).float().mean().item()
+            test_metric = (preds[self.test_mask] == self.targets[self.test_mask]).float().mean().item()
+
+        elif self.metric_name == 'AP':
+            targets = self.targets.cpu().numpy()
+            preds = preds.cpu().numpy()
+
+            train_mask = self.train_mask.cpu().numpy()
+            val_mask = self.val_mask.cpu().numpy()
+            test_mask = self.test_mask.cpu().numpy()
+
+            train_metric = average_precision_score(y_true=targets[train_mask], y_score=preds[train_mask]).item()
+            val_metric = average_precision_score(y_true=targets[val_mask], y_score=preds[val_mask]).item()
+            test_metric = average_precision_score(y_true=targets[test_mask], y_score=preds[test_mask]).item()
+
+        elif self.metric_name == 'R2':
+            preds_orig = self.regression_targets_transform.inverse_transform(preds.cpu().numpy()[:, None]).squeeze(1)
+
+            train_mask = self.train_mask.cpu().numpy()
+            val_mask = self.val_mask.cpu().numpy()
+            test_mask = self.test_mask.cpu().numpy()
+
+            train_metric = r2_score(y_true=self.targets_orig[train_mask], y_pred=preds_orig[train_mask])
+            val_metric = r2_score(y_true=self.targets_orig[val_mask], y_pred=preds_orig[val_mask])
+            test_metric = r2_score(y_true=self.targets_orig[test_mask], y_pred=preds_orig[test_mask])
+
+        else:
+            raise ValueError(f'Unknown metric: {self.metric_name}.')
+
+        metrics = {
+            f'train {self.metric_name}': train_metric,
+            f'val {self.metric_name}': val_metric,
+            f'test {self.metric_name}': test_metric
+        }
+
+        return metrics
+
+    def compute_val_metric_inductive(self, preds):
+        if self.metric_name == 'accuracy':
+            preds = preds.argmax(axis=1)
+            val_metric = (preds[self.val_mask] == self.val_targets[self.val_mask]).float().mean().item()
+
+        elif self.metric_name == 'AP':
+            val_targets = self.val_targets.cpu().numpy()
+            preds = preds.cpu().numpy()
+            val_mask = self.val_mask.cpu().numpy()
+            val_metric = average_precision_score(y_true=val_targets[val_mask], y_score=preds[val_mask]).item()
+
+        elif self.metric_name == 'R2':
+            preds_orig = self.regression_targets_transform.inverse_transform(preds.cpu().numpy()[:, None]).squeeze(1)
+            val_mask = self.val_mask.cpu().numpy()
+            val_metric = r2_score(y_true=self.val_targets_orig[val_mask], y_pred=preds_orig[val_mask])
+
+        else:
+            raise ValueError(f'Unknown metric: {self.metric_name}.')
+
+        return val_metric
+
+    def compute_test_metric_inductive(self, preds):
+        if self.metric_name == 'accuracy':
+            preds = preds.argmax(axis=1)
+            test_metric = (preds[self.test_mask] == self.test_targets[self.test_mask]).float().mean().item()
+
+        elif self.metric_name == 'AP':
+            test_targets = self.test_targets.cpu().numpy()
+            preds = preds.cpu().numpy()
+            test_mask = self.test_mask.cpu().numpy()
+            test_metric = average_precision_score(y_true=test_targets[test_mask], y_score=preds[test_mask]).item()
+
+        elif self.metric_name == 'R2':
+            preds_orig = self.regression_targets_transform.inverse_transform(preds.cpu().numpy()[:, None]).squeeze(1)
+            test_mask = self.test_mask.cpu().numpy()
+            test_metric = r2_score(y_true=self.test_targets_orig[test_mask], y_pred=preds_orig[test_mask])
+
+        else:
+            raise ValueError(f'Unknown metric: {self.metric_name}.')
+
+        return test_metric
+
+    @staticmethod
+    def get_tabgraphs_old_dataset(name, add_self_loops, use_node_embeddings):
+        with open(f'data/{name}/info.yaml', 'r') as file:
+            info = yaml.safe_load(file)
+
+        features_df = pd.read_csv(f'data/{name}/features.csv', index_col=0)
+        numerical_features = features_df[info['num_feature_names']].values.astype(np.float32)
+        binary_features = features_df[info['bin_feature_names']].values.astype(np.float32)
+        categorical_features = features_df[info['cat_feature_names']].values.astype(np.float32)
+        targets = features_df[info['target_name']].values.astype(np.float32)
+
+        if categorical_features.shape[1] > 0:
+            one_hot_encoder = OneHotEncoder(sparse_output=False, dtype=np.float32)
+            categorical_features = one_hot_encoder.fit_transform(categorical_features)
+
+        if use_node_embeddings:
+            node_embeddings = np.load(f'data/{name}/node_embeddings.npz')['node_embeds']
+
+        train_mask = pd.read_csv(f'data/{name}/train_mask.csv', index_col=0).values.squeeze(1)
+        val_mask = pd.read_csv(f'data/{name}/valid_mask.csv', index_col=0).values.squeeze(1)
+        test_mask = pd.read_csv(f'data/{name}/test_mask.csv', index_col=0).values.squeeze(1)
+
+        edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
+        edges = edges_df.values[:, :2]
+
+        features = np.concatenate([numerical_features, binary_features, categorical_features], axis=1)
+        if use_node_embeddings:
+            features = np.concatenate([features, node_embeddings], axis=1)
+
+        if numerical_features.shape[1] > 0:
+            numerical_features_mask = np.zeros(features.shape[1], dtype=bool)
+            numerical_features_mask[:numerical_features.shape[1]] = True
+        else:
+            numerical_features_mask = None
+
+        features = torch.tensor(features)
+        targets = torch.tensor(targets)
+
+        if numerical_features_mask is not None:
+            numerical_features_mask = torch.tensor(numerical_features_mask)
+
+        graph = Dataset.get_graph(edges=edges, num_nodes=len(features), add_self_loops=add_self_loops)
+
+        train_mask = torch.tensor(train_mask)
+        val_mask = torch.tensor(val_mask)
+        test_mask = torch.tensor(test_mask)
+
+        return graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask
+
+    @staticmethod
+    def get_tabgraphs_transductive_dataset(name, add_self_loops, use_node_embeddings):
+        split_type = 'temporal' if name[-1] == 'T' else 'random'
+        name = '-'.join(name.split('-')[:-1])
+
+        with open(f'data/{name}/info.yaml', 'r') as file:
+            info = yaml.safe_load(file)
+
+        proportion_features_names_set = set(info['proportion_features_names'])
+        numerical_features_names = [
+            name for name in info['num_features_names'] if name not in proportion_features_names_set
+        ]
+
+        features_df = pd.read_csv(f'data/{name}/features.csv', index_col=0)
+        numerical_features = features_df[numerical_features_names].values.astype(np.float32)
+        proportion_features = features_df[info['proportion_features_names']].values.astype(np.float32)
+        categorical_features = features_df[info['cat_features_names']].values.astype(np.float32)
+        targets = features_df[info['target_name']].values.astype(np.float32)
+
+        if categorical_features.shape[1] > 0:
+            one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32)
+            categorical_features = one_hot_encoder.fit_transform(categorical_features)
+
+        if use_node_embeddings:
+            node_embeddings = np.load(f'data/{name}/node_embeddings.npz')['node_embeds']
+
+        features = np.concatenate([numerical_features, proportion_features, categorical_features], axis=1)
+        if use_node_embeddings:
+            features = np.concatenate([features, node_embeddings], axis=1)
+
+        if numerical_features.shape[1] > 0:
+            numerical_features_mask = np.zeros(features.shape[1], dtype=bool)
+            numerical_features_mask[:numerical_features.shape[1]] = True
+        else:
+            numerical_features_mask = None
+
+        edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
+        edges = edges_df.values[:, :2]
+
+        split = np.load(f'data/{name}/{split_type}_split.npz')
+        train_mask_orig = split['train_mask']
+        val_mask_orig = split['val_mask']
+        test_mask_orig = split['test_mask']
+
+        labeled_mask = ~np.isnan(targets)
+        train_mask = (train_mask_orig & labeled_mask)
+        val_mask = (val_mask_orig & labeled_mask)
+        test_mask = (test_mask_orig & labeled_mask)
+
+        graph = Dataset.get_graph(edges=edges, num_nodes=len(features), add_self_loops=add_self_loops)
+
+        features = torch.tensor(features)
+        targets = torch.tensor(targets)
+        train_mask = torch.tensor(train_mask)
+        val_mask = torch.tensor(val_mask)
+        test_mask = torch.tensor(test_mask)
+
+        if numerical_features_mask is not None:
+            numerical_features_mask = torch.tensor(numerical_features_mask)
+
+        return graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask
+
+    @staticmethod
+    def get_tabgraphs_inductive_dataset(name, add_self_loops, use_node_embeddings):
+        name = '-'.join(name.split('-')[:-1])
+
+        with open(f'data/{name}/info.yaml', 'r') as file:
+            info = yaml.safe_load(file)
+
+        proportion_features_names_set = set(info['proportion_features_names'])
+        numerical_features_names = [
+            name for name in info['num_features_names'] if name not in proportion_features_names_set
+        ]
+
+        features_df = pd.read_csv(f'data/{name}/features.csv', index_col=0)
+        numerical_features = features_df[numerical_features_names].values.astype(np.float32)
+        proportion_features = features_df[info['proportion_features_names']].values.astype(np.float32)
+        categorical_features = features_df[info['cat_features_names']].values.astype(np.float32)
+        targets = features_df[info['target_name']].values.astype(np.float32)
+
+        if categorical_features.shape[1] > 0:
+            one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32)
+            categorical_features = one_hot_encoder.fit_transform(categorical_features)
+
+        if use_node_embeddings:
+            node_embeddings = np.load(f'data/{name}/node_embeddings.npz')['node_embeds']
+
+        features = np.concatenate([numerical_features, proportion_features, categorical_features], axis=1)
+        if use_node_embeddings:
+            features = np.concatenate([features, node_embeddings], axis=1)
+
+        if numerical_features.shape[1] > 0:
+            numerical_features_mask = np.zeros(features.shape[1], dtype=bool)
+            numerical_features_mask[:numerical_features.shape[1]] = True
+        else:
+            numerical_features_mask = None
+
+        edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
+        edges = edges_df.values[:, :2]
+
+        split = np.load(f'data/{name}/temporal_split.npz')
+        train_mask_orig = split['train_mask']
+        val_mask_orig = split['val_mask']
+        test_mask_orig = split['test_mask']
+
+        train_and_val_mask_orig = (train_mask_orig | val_mask_orig)
+
+        train_edges = Dataset.get_induced_subgraph_edges(edges=edges, nodes_to_keep=np.where(train_mask_orig)[0])
+        train_features = features[train_mask_orig]
+        train_targets = targets[train_mask_orig]
+
+        val_edges = Dataset.get_induced_subgraph_edges(edges=edges, nodes_to_keep=np.where(train_and_val_mask_orig)[0])
+        val_features = features[train_and_val_mask_orig]
+        val_targets = targets[train_and_val_mask_orig]
+
+        test_edges = edges
+        test_features = features
+        test_targets = targets
+
+        labeled_mask = ~np.isnan(targets)
+        train_mask = labeled_mask[train_mask_orig]
+        val_mask = (val_mask_orig & labeled_mask)[train_and_val_mask_orig]
+        test_mask = (test_mask_orig & labeled_mask)
+
+        train_graph = Dataset.get_graph(edges=train_edges, num_nodes=len(train_features), add_self_loops=add_self_loops)
+        val_graph = Dataset.get_graph(edges=val_edges, num_nodes=len(val_features), add_self_loops=add_self_loops)
+        test_graph = Dataset.get_graph(edges=test_edges, num_nodes=len(test_features), add_self_loops=add_self_loops)
+
+        train_features = torch.tensor(train_features)
+        train_targets = torch.tensor(train_targets)
+        train_mask = torch.tensor(train_mask)
+
+        val_features = torch.tensor(val_features)
+        val_targets = torch.tensor(val_targets)
+        val_mask = torch.tensor(val_mask)
+
+        test_features = torch.tensor(test_features)
+        test_targets = torch.tensor(test_targets)
+        test_mask = torch.tensor(test_mask)
+
+        if numerical_features_mask is not None:
+            numerical_features_mask = torch.tensor(numerical_features_mask)
+
+        return (
+            train_graph, train_features, train_targets, train_mask,
+            val_graph, val_features, val_targets, val_mask,
+            test_graph, test_features, test_targets, test_mask,
+            numerical_features_mask
+        )
+
+    @staticmethod
+    def get_pyg_dataset(name, add_self_loops):
+        if name in ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions']:
+            dataset = pyg_datasets.HeterophilousGraphDataset(name=name, root='data')
+        elif name in ['cora', 'citeseer', 'pubmed']:
+            dataset = pyg_datasets.Planetoid(name=name, root='data')
+        elif name in ['coauthor-cs', 'coauthor-physics']:
+            dataset = pyg_datasets.Coauthor(name=name.split('-')[1], root=os.path.join('data', 'coauthor'))
+        elif name in ['amazon-computers', 'amazon-photo']:
+            dataset = pyg_datasets.Amazon(name=name.split('-')[1], root=os.path.join('data', 'amazon'))
+        elif name == 'lastfm-asia':
+            dataset = pyg_datasets.LastFMAsia(root=os.path.join('data', name))
+        elif name == 'facebook':
+            dataset = pyg_datasets.FacebookPagePage(root=os.path.join('data', name))
+        else:
+            raise ValueError(f'Unknown PyG dataset name: {name}.')
+
+        pyg_data = dataset[0]
+        features = pyg_data.x
+        targets = pyg_data.y
+        num_nodes = len(features)
+        edges = pyg_data.edge_index.T
+        graph = Dataset.get_graph(edges=edges, num_nodes=num_nodes, add_self_loops=add_self_loops)
+
+        # Get data splits.
+        if name in Dataset.pyg_datasets_with_predefined_splits_names:
+            # These datasets have 10 predefined data splits, but we will only use the first one.
+            train_mask = pyg_data.train_mask[:, 0]
+            val_mask = pyg_data.val_mask[:, 0]
+            test_mask = pyg_data.test_mask[:, 0]
+        else:
+            # A random stratified by class data split will be created.
+            train_idx, val_and_test_idx = train_test_split(torch.arange(num_nodes), test_size=0.75, random_state=0,
+                                                           stratify=targets)
+            val_idx, test_idx = train_test_split(val_and_test_idx, test_size=0.66, random_state=0,
+                                                 stratify=targets[val_and_test_idx])
+
+            train_mask = torch.zeros_like(targets, dtype=torch.bool)
+            train_mask[train_idx] = True
+
+            val_mask = torch.zeros_like(targets, dtype=torch.bool)
+            val_mask[val_idx] = True
+
+            test_mask = torch.zeros_like(targets, dtype=torch.bool)
+            test_mask[test_idx] = True
+
+        return graph, features, targets, train_mask, val_mask, test_mask
+
+    @staticmethod
+    def get_ogb_dataset(name, add_self_loops):
+        dataset = NodePropPredDataset(name=name, root='data')
+        data, targets = dataset[0]
+        targets = torch.tensor(targets.squeeze(1))
+        features = torch.tensor(data['node_feat'])
+        edges = data['edge_index'].T
+        graph = Dataset.get_graph(edges=edges, num_nodes=len(features), add_self_loops=add_self_loops)
+
+        split = dataset.get_idx_split()
+        train_idx = split['train']
+        val_idx = split['valid']
+        test_idx = split['test']
+
+        train_mask = torch.zeros_like(targets, dtype=torch.bool)
+        train_mask[train_idx] = True
+
+        val_mask = torch.zeros_like(targets, dtype=torch.bool)
+        val_mask[val_idx] = True
+
+        test_mask = torch.zeros_like(targets, dtype=torch.bool)
+        test_mask[test_idx] = True
+
+        return graph, features, targets, train_mask, val_mask, test_mask
+
+    @staticmethod
+    def get_graph(edges, num_nodes, add_self_loops):
+        graph = dgl.graph((edges[:, 0], edges[:, 1]), num_nodes=num_nodes, idtype=torch.int32)
+
+        graph = dgl.remove_self_loop(graph)
+        graph = dgl.to_simple(graph)
+        graph = dgl.to_bidirected(graph)
+
+        if add_self_loops:
+            graph = dgl.add_self_loop(graph)
+
+        return graph
+
+    @staticmethod
+    def get_induced_subgraph_edges(edges, nodes_to_keep):
+        old_node_id_to_new_node_id = {
+            old_node_id: new_node_id for new_node_id, old_node_id in enumerate(sorted(nodes_to_keep))
+        }
+
+        nodes_to_keep = set(nodes_to_keep)
+
+        edges = np.array([
+            (old_node_id_to_new_node_id[u], old_node_id_to_new_node_id[v]) for u, v in edges
+            if u in nodes_to_keep and v in nodes_to_keep
+        ])
+
+        return edges
