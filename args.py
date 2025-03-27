@@ -19,6 +19,8 @@ class ExperimentConfig:
     name: str = 'experiment'
     save_dir: str = 'experiments'
     dataset: str = 'tolokers-tab'
+    split: str = 'RH'
+    transductive: bool = True
     train_regime: str = 'full-graph'
     config: str = None
 
@@ -79,16 +81,18 @@ def get_args():
     parser.add_argument('--name', type=str, default=None, help='Experiment name.')
     parser.add_argument('--save_dir', type=str, default=None, help='Base directory for saving information.')
     parser.add_argument('--dataset', type=str, default=None,
-                        choices=['games-categories-TR', 'games-categories-TT', 'games-categories-I', 'games-ctr-TR',
-                                 'games-ctr-TT', 'games-ctr-I', 'hm-prices-TR', 'hm-prices-TT', 'hm-prices-I',
-                                 'avazu-devices-TR', 'avazu-devices-TT', 'avazu-devices-I', 'city-reviews-TR',
-                                 'city-reviews-TT', 'city-reviews-I', 'city-roads-M-TR', 'city-roads-L-TR',
+                        choices=['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-devices',
+                                 'city-reviews', 'city-roads-M', 'city-roads-L',
                                  'tolokers-tab-old', 'questions-tab-old', 'city-reviews-old', 'browser-games-old',
                                  'hm-categories-old', 'web-fraud-old', 'city-roads-M-old', 'city-roads-L-old',
-                                 'avazu-devices-old', 'hm-prices-old', 'web-traffic-old', 'roman-empire',
-                                 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer', 'pubmed',
-                                 'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia',
-                                 'facebook', 'ogbn-arxiv', 'ogbn-products'])
+                                 'avazu-devices-old', 'hm-prices-old', 'web-traffic-old',
+                                 'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions',
+                                 'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
+                                 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
+                                 'ogbn-arxiv', 'ogbn-products'])
+    parser.add_argument('--split', type=str, default=None,
+                        choices=['RH', 'RL', 'T1', 'T2', 'T3', 'T4', 'R1', 'R2', 'R3', 'R4'])
+    parser.add_argument('--transductive', type=str_to_bool, default=None)
     parser.add_argument('--train_regime', type=str, default=None, choices=['full-graph', 'minibatch'])
     parser.add_argument('--config', type=str, default=None, help='Name of a config yaml file in the configs directory.')
 

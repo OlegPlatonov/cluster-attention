@@ -25,30 +25,24 @@ class Dataset:
     tabgraphs_old_datasets_names = ['tolokers-tab-old', 'questions-tab-old', 'city-reviews-old', 'browser-games-old',
                                     'hm-categories-old', 'web-fraud-old', 'city-roads-M-old', 'city-roads-L-old',
                                     'avazu-devices-old', 'hm-prices-old', 'web-traffic-old']
-    tabgraphs_transductive_datasets_names = ['games-categories-TR', 'games-categories-TT', 'games-ctr-TR',
-                                             'games-ctr-TT', 'hm-prices-TR', 'hm-prices-TT', 'avazu-devices-TR',
-                                             'avazu-devices-TT', 'city-reviews-TR', 'city-reviews-TT',
-                                             'city-roads-M-TR', 'city-roads-L-TR']
-    tabgraphs_inductive_datasets_names = ['games-categories-I', 'games-ctr-I', 'hm-prices-I', 'avazu-devices-I',
-                                          'city-reviews-I']
+    tabgraphs_datasets_names = ['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-devices',
+                                'city-reviews', 'city-roads-M', 'city-roads-L']
     pyg_datasets_names = ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer',
                           'pubmed', 'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo',
                           'lastfm-asia', 'facebook']
     ogb_datasets_names = ['ogbn-arxiv', 'ogbn-products']
 
     # Datasets by task.
-    multiclass_classification_datasets_names = ['games-categories-TR', 'games-categories-TT', 'games-categories-I',
-                                                'browser-games-old', 'hm-categories-old', 'roman-empire',
-                                                'amazon-ratings', 'cora', 'citeseer', 'pubmed', 'coauthor-cs',
-                                                'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia',
-                                                'facebook', 'ogbn-arxiv', 'ogbn-products']
-    binary_classification_datasets_names = ['city-reviews-TR', 'city-reviews-TT', 'city-reviews-I', 'tolokers-tab-old',
-                                            'questions-tab-old', 'city-reviews-old', 'web-fraud-old', 'minesweeper',
-                                            'tolokers', 'questions']
-    regression_datasets_names = ['games-ctr-TR', 'games-ctr-TT', 'games-ctr-I', 'hm-prices-TR', 'hm-prices-TT',
-                                 'hm-prices-I', 'avazu-devices-TR', 'avazu-devices-TT', 'avazu-devices-I',
-                                 'city-roads-M-TR', 'city-roads-L-TR', 'city-roads-M-old', 'city-roads-L-old',
-                                 'avazu-devices-old', 'hm-prices-old', 'web-traffic-old']
+    multiclass_classification_datasets_names = ['hm-categories', 'games-categories', 'browser-games-old',
+                                                'hm-categories-old', 'roman-empire', 'amazon-ratings', 'cora',
+                                                'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
+                                                'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
+                                                'ogbn-arxiv', 'ogbn-products']
+    binary_classification_datasets_names = ['city-reviews', 'tolokers-tab-old', 'questions-tab-old', 'city-reviews-old',
+                                            'web-fraud-old', 'minesweeper', 'tolokers', 'questions']
+    regression_datasets_names = ['hm-prices', 'games-ctr', 'avazu-devices', 'city-roads-M', 'city-roads-L',
+                                 'city-roads-M-old', 'city-roads-L-old', 'avazu-devices-old', 'hm-prices-old',
+                                 'web-traffic-old']
 
     # Not all datasets obtained from PyG have predefined data splits. Random class stratified splits will be used for
     # other datasets.
@@ -67,7 +61,7 @@ class Dataset:
                                               random_state=0, copy=False)
     }
 
-    def __init__(self, name, add_self_loops=False, use_node_embeddings=False,
+    def __init__(self, name, split=None, transductive=True, add_self_loops=False, use_node_embeddings=False,
                  numerical_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
                  regression_targets_transform='none', device='cpu'):
         print('Preparing data...')
@@ -75,35 +69,31 @@ class Dataset:
             graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
                 self.get_tabgraphs_old_dataset(name=name, add_self_loops=add_self_loops,
                                                use_node_embeddings=use_node_embeddings)
-            transductive = True
 
-        elif name in self.tabgraphs_transductive_datasets_names:
-            graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
-                self.get_tabgraphs_transductive_dataset(name=name, add_self_loops=add_self_loops,
-                                                        use_node_embeddings=use_node_embeddings)
-            transductive = True
+        elif name in self.tabgraphs_datasets_names:
+            if transductive:
+                graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
+                    self.get_tabgraphs_transductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
+                                                            use_node_embeddings=use_node_embeddings)
 
-        elif name in self.tabgraphs_inductive_datasets_names:
-            (train_graph, train_features, train_targets, train_mask,
-             val_graph, val_features, val_targets, val_mask, test_graph,
-             test_features, test_targets, test_mask, numerical_features_mask) = \
-                self.get_tabgraphs_inductive_dataset(name=name, add_self_loops=add_self_loops,
-                                                     use_node_embeddings=use_node_embeddings)
-            transductive = False
+            else:
+                (train_graph, train_features, train_targets, train_mask,
+                 val_graph, val_features, val_targets, val_mask, test_graph,
+                 test_features, test_targets, test_mask, numerical_features_mask) = \
+                    self.get_tabgraphs_inductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
+                                                         use_node_embeddings=use_node_embeddings)
 
         elif name in self.pyg_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_pyg_dataset(
                 name=name, add_self_loops=add_self_loops
             )
             numerical_features_mask = None
-            transductive = True
 
         elif name in self.ogb_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_ogb_dataset(
                 name=name, add_self_loops=add_self_loops
             )
             numerical_features_mask = None
-            transductive = True
 
         else:
             raise ValueError(f'Unkown dataset name: {name}.')
@@ -426,10 +416,7 @@ class Dataset:
         return graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask
 
     @staticmethod
-    def get_tabgraphs_transductive_dataset(name, add_self_loops, use_node_embeddings):
-        split_type = 'temporal' if name[-1] == 'T' else 'random'
-        name = '-'.join(name.split('-')[:-1])
-
+    def get_tabgraphs_transductive_dataset(name, split, add_self_loops, use_node_embeddings):
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
@@ -464,7 +451,7 @@ class Dataset:
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
 
-        split = np.load(f'data/{name}/{split_type}_split.npz')
+        split = np.load(f'data/{name}/split_{split}.npz')
         train_mask_orig = split['train_mask']
         val_mask_orig = split['val_mask']
         test_mask_orig = split['test_mask']
@@ -488,9 +475,7 @@ class Dataset:
         return graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask
 
     @staticmethod
-    def get_tabgraphs_inductive_dataset(name, add_self_loops, use_node_embeddings):
-        name = '-'.join(name.split('-')[:-1])
-
+    def get_tabgraphs_inductive_dataset(name, split, add_self_loops, use_node_embeddings):
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
@@ -525,7 +510,7 @@ class Dataset:
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
 
-        split = np.load(f'data/{name}/temporal_split.npz')
+        split = np.load(f'data/{name}/split_{split}.npz')
         train_mask_orig = split['train_mask']
         val_mask_orig = split['val_mask']
         test_mask_orig = split['test_mask']
