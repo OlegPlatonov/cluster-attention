@@ -90,8 +90,7 @@ def get_args():
                                  'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
                                  'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
                                  'ogbn-arxiv', 'ogbn-products'])
-    parser.add_argument('--split', type=str, default=None,
-                        choices=['RH', 'RL', 'T1', 'T2', 'T3', 'T4', 'R1', 'R2', 'R3', 'R4'])
+    parser.add_argument('--split', type=str, default=None)
     parser.add_argument('--transductive', type=str_to_bool, default=None)
     parser.add_argument('--train_regime', type=str, default=None, choices=['full-graph', 'minibatch'])
     parser.add_argument('--config', type=str, default=None, help='Name of a config yaml file in the configs directory.')
