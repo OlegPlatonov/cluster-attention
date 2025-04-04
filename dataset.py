@@ -62,24 +62,28 @@ class Dataset:
     }
 
     def __init__(self, name, split=None, transductive=True, add_self_loops=False, use_node_embeddings=False,
-                 numerical_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
-                 regression_targets_transform='none', device='cpu'):
+                 regression_targets_transform='none', numerical_features_transform='none',
+                 proportion_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
+                 proportion_features_nan_imputation_strategy='most_frequent', device='cpu'):
         print('Preparing data...')
         if name in self.tabgraphs_old_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
                 self.get_tabgraphs_old_dataset(name=name, add_self_loops=add_self_loops,
                                                use_node_embeddings=use_node_embeddings)
+            proportion_features_mask = None
 
         elif name in self.tabgraphs_datasets_names:
             if transductive:
-                graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
+                (graph, features, targets, train_mask, val_mask, test_mask,
+                 numerical_features_mask, proportion_features_mask) = \
                     self.get_tabgraphs_transductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
                                                             use_node_embeddings=use_node_embeddings)
 
             else:
                 (train_graph, train_features, train_targets, train_mask,
-                 val_graph, val_features, val_targets, val_mask, test_graph,
-                 test_features, test_targets, test_mask, numerical_features_mask) = \
+                 val_graph, val_features, val_targets, val_mask,
+                 test_graph, test_features, test_targets, test_mask,
+                 numerical_features_mask, proportion_features_mask) = \
                     self.get_tabgraphs_inductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
                                                          use_node_embeddings=use_node_embeddings)
 
@@ -87,13 +91,13 @@ class Dataset:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_pyg_dataset(
                 name=name, add_self_loops=add_self_loops
             )
-            numerical_features_mask = None
+            numerical_features_mask, proportion_features_mask = None, None
 
         elif name in self.ogb_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_ogb_dataset(
                 name=name, add_self_loops=add_self_loops
             )
-            numerical_features_mask = None
+            numerical_features_mask, proportion_features_mask = None, None
 
         else:
             raise ValueError(f'Unkown dataset name: {name}.')
@@ -189,35 +193,30 @@ class Dataset:
                 self.val_numerical_features_orig = val_features[:, numerical_features_mask].clone().numpy()
                 self.test_numerical_features_orig = test_features[:, numerical_features_mask].clone().numpy()
 
+        if proportion_features_mask is None:
+            self.proportion_features_mask = None
+        else:
+            self.proportion_features_mask = proportion_features_mask.to(device)
+            self.proportion_features_transform_name = None
+            self.proportion_features_nan_imputation_strategy = None
+            if transductive:
+                self.proportion_features_orig = features[:, proportion_features_mask].clone().numpy()
+            else:
+                self.train_proportion_features_orig = train_features[:, proportion_features_mask].clone().numpy()
+                self.val_proportion_features_orig = val_features[:, proportion_features_mask].clone().numpy()
+                self.test_proportion_features_orig = test_features[:, proportion_features_mask].clone().numpy()
+
         self.apply_transforms(regression_targets_transform_name=regression_targets_transform,
                               numerical_features_transform_name=numerical_features_transform,
-                              numerical_features_nan_imputation_strategy=numerical_features_nan_imputation_strategy)
+                              proportion_features_transform_name=proportion_features_transform,
+                              numerical_features_nan_imputation_strategy=numerical_features_nan_imputation_strategy,
+                              proportion_features_nan_imputation_strategy=proportion_features_nan_imputation_strategy)
 
     def apply_transforms(self, regression_targets_transform_name, numerical_features_transform_name,
-                         numerical_features_nan_imputation_strategy):
+                         proportion_features_transform_name, numerical_features_nan_imputation_strategy,
+                         proportion_features_nan_imputation_strategy):
         if self.task == 'regression' and regression_targets_transform_name != self.regression_targets_transform_name:
-            regression_targets_transform = self.transforms[regression_targets_transform_name]()
-            if self.transductive:
-                regression_targets_transform.fit(self.targets_orig[:, None])
-                targets = regression_targets_transform.transform(self.targets_orig.copy()[:, None]).squeeze(1)
-                self.targets = torch.tensor(targets, device=self.device)
-            else:
-                regression_targets_transform.fit(self.train_targets_orig[:, None])
-                train_targets = regression_targets_transform.transform(
-                    self.train_targets_orig.copy()[:, None]
-                ).squeeze(1)
-                val_targets = regression_targets_transform.transform(
-                    self.val_targets_orig.copy()[:, None]
-                ).squeeze(1)
-                test_targets = regression_targets_transform.transform(
-                    self.test_targets_orig.copy()[:, None]
-                ).squeeze(1)
-                self.train_targets = torch.tensor(train_targets, device=self.device)
-                self.val_targets = torch.tensor(val_targets, device=self.device)
-                self.test_targets = torch.tensor(test_targets, device=self.device)
-
-            self.regression_targets_transform_name = regression_targets_transform_name
-            self.regression_targets_transform = regression_targets_transform
+            self.transform_targets(transform_name=regression_targets_transform_name)
 
         if (
                 self.numerical_features_mask is not None and
@@ -226,62 +225,123 @@ class Dataset:
                         numerical_features_nan_imputation_strategy != self.numerical_features_nan_imputation_strategy
                 )
         ):
-            numerical_features_transform = self.transforms[numerical_features_transform_name]()
-            numerical_features_imputer = SimpleImputer(missing_values=np.nan,
-                                                       strategy=numerical_features_nan_imputation_strategy,
-                                                       copy=False)
+            self.transform_features(features_type='numerical',
+                                    transform_name=numerical_features_transform_name,
+                                    nan_imputation_strategy=numerical_features_nan_imputation_strategy)
 
-            if self.transductive:
-                numerical_features_transform.fit(self.numerical_features_orig)
-                numerical_features = numerical_features_transform.transform(self.numerical_features_orig.copy())
-
-                if np.isnan(numerical_features).any():
-                    numerical_features_imputer.fit(numerical_features)
-                    numerical_features = numerical_features_imputer.transform(numerical_features)
-
-                self.features[:, self.numerical_features_mask] = torch.tensor(numerical_features, device=self.device)
-
-            else:
-                numerical_features_transform.fit(self.train_numerical_features_orig)
-                train_numerical_features = numerical_features_transform.transform(
-                    self.train_numerical_features_orig.copy()
+        if (
+                self.proportion_features_mask is not None and
+                (
+                        proportion_features_transform_name != self.proportion_features_transform_name or
+                        proportion_features_nan_imputation_strategy != self.proportion_features_nan_imputation_strategy
                 )
-                val_numerical_features = numerical_features_transform.transform(
-                    self.val_numerical_features_orig.copy()
-                )
-                test_numerical_features = numerical_features_transform.transform(
-                    self.test_numerical_features_orig.copy()
-                )
-
-                if (
-                        np.isnan(train_numerical_features).any() or
-                        np.isnan(val_numerical_features).any() or
-                        np.isnan(test_numerical_features).any()
-                ):
-                    numerical_features_imputer.fit(train_numerical_features)
-                    train_numerical_features = numerical_features_imputer.transform(train_numerical_features)
-                    val_numerical_features = numerical_features_imputer.transform(val_numerical_features)
-                    test_numerical_features = numerical_features_imputer.transform(test_numerical_features)
-
-                self.train_features[:, self.numerical_features_mask] = torch.tensor(
-                    train_numerical_features, device=self.device
-                )
-                self.val_features[:, self.numerical_features_mask] = torch.tensor(
-                    val_numerical_features, device=self.device
-                )
-                self.test_features[:, self.numerical_features_mask] = torch.tensor(
-                    test_numerical_features, device=self.device
-                )
-
-            self.numerical_features_transform_name = numerical_features_transform_name
-            self.numerical_features_nan_imputation_strategy = numerical_features_nan_imputation_strategy
+        ):
+            self.transform_features(features_type='proportion',
+                                    transform_name=proportion_features_transform_name,
+                                    nan_imputation_strategy=proportion_features_nan_imputation_strategy)
 
     def apply_transforms_from_args(self, args):
         self.apply_transforms(
             regression_targets_transform_name=args.regression_targets_transform,
             numerical_features_transform_name=args.numerical_features_transform,
-            numerical_features_nan_imputation_strategy=args.numerical_features_nan_imputation_strategy
+            proportion_features_transform_name=args.proportion_features_transform,
+            numerical_features_nan_imputation_strategy=args.numerical_features_nan_imputation_strategy,
+            proportion_features_nan_imputation_strategy=args.proportion_features_nan_imputation_strategy
         )
+
+    def transform_targets(self, transform_name):
+        transform = self.transforms[transform_name]()
+
+        if self.transductive:
+            transform.fit(self.targets_orig[:, None])
+            targets = transform.transform(self.targets_orig.copy()[:, None]).squeeze(1)
+            self.targets = torch.tensor(targets, device=self.device)
+
+        else:
+            transform.fit(self.train_targets_orig[:, None])
+
+            train_targets = transform.transform(self.train_targets_orig.copy()[:, None]).squeeze(1)
+            val_targets = transform.transform(self.val_targets_orig.copy()[:, None]).squeeze(1)
+            test_targets = transform.transform(self.test_targets_orig.copy()[:, None]).squeeze(1)
+
+            self.train_targets = torch.tensor(train_targets, device=self.device)
+            self.val_targets = torch.tensor(val_targets, device=self.device)
+            self.test_targets = torch.tensor(test_targets, device=self.device)
+
+        self.regression_targets_transform_name = transform_name
+        self.regression_targets_transform = transform
+
+    def transform_features(self, features_type, transform_name, nan_imputation_strategy):
+        transform = self.transforms[transform_name]()
+        imputer = SimpleImputer(missing_values=np.nan, strategy=nan_imputation_strategy, copy=False)
+
+        if features_type == 'numerical':
+            mask = self.numerical_features_mask
+        elif features_type == 'proportion':
+            mask = self.proportion_features_mask
+        else:
+            raise ValueError(
+                f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+            )
+
+        if self.transductive:
+            if features_type == 'numerical':
+                features_orig = self.numerical_features_orig
+            elif features_type == 'proportion':
+                features_orig = self.proportion_features_orig
+            else:
+                raise ValueError(
+                    f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+                )
+
+            transform.fit(features_orig)
+            features = transform.transform(features_orig.copy())
+
+            if np.isnan(features).any():
+                imputer.fit(features)
+                features = imputer.transform(features)
+
+            self.features[:, mask] = torch.tensor(features, device=self.device)
+
+        else:
+            if features_type == 'numerical':
+                train_features_orig = self.train_numerical_features_orig
+                val_features_orig = self.val_numerical_features_orig
+                test_features_orig = self.test_numerical_features_orig
+            elif features_type == 'proportion':
+                train_features_orig = self.train_proportion_features_orig
+                val_features_orig = self.val_proportion_features_orig
+                test_features_orig = self.test_proportion_features_orig
+            else:
+                raise ValueError(
+                    f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+                )
+
+            transform.fit(train_features_orig)
+            train_features = transform.transform(train_features_orig.copy())
+            val_features = transform.transform(val_features_orig.copy())
+            test_features = transform.transform(test_features_orig.copy())
+
+            if np.isnan(train_features).any() or np.isnan(val_features).any() or np.isnan(test_features).any():
+                imputer.fit(train_features)
+                train_features = imputer.transform(train_features)
+                val_features = imputer.transform(val_features)
+                test_features = imputer.transform(test_features)
+
+            self.train_features[:, mask] = torch.tensor(train_features, device=self.device)
+            self.val_features[:, mask] = torch.tensor(val_features, device=self.device)
+            self.test_features[:, mask] = torch.tensor(test_features, device=self.device)
+
+        if features_type == 'numerical':
+            self.numerical_features_transform_name = transform_name
+            self.numerical_features_nan_imputation_strategy = nan_imputation_strategy
+        elif features_type == 'proportion':
+            self.proportion_features_transform_name = transform_name
+            self.proportion_features_nan_imputation_strategy = nan_imputation_strategy
+        else:
+            raise ValueError(
+                f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+            )
 
     def compute_metrics_transductive(self, preds):
         if self.metric_name == 'accuracy':
@@ -448,6 +508,14 @@ class Dataset:
         else:
             numerical_features_mask = None
 
+        if proportion_features.shape[1] > 0:
+            proportion_features_mask = np.zeros(features.shape[1], dtype=bool)
+            proportion_features_mask[
+                numerical_features.shape[1]:numerical_features.shape[1] + proportion_features.shape[1]
+            ] = True
+        else:
+            proportion_features_mask = None
+
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
 
@@ -472,7 +540,12 @@ class Dataset:
         if numerical_features_mask is not None:
             numerical_features_mask = torch.tensor(numerical_features_mask)
 
-        return graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask
+        if proportion_features_mask is not None:
+            proportion_features_mask = torch.tensor(proportion_features_mask)
+
+        return (
+            graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask, proportion_features_mask
+        )
 
     @staticmethod
     def get_tabgraphs_inductive_dataset(name, split, add_self_loops, use_node_embeddings):
@@ -506,6 +579,14 @@ class Dataset:
             numerical_features_mask[:numerical_features.shape[1]] = True
         else:
             numerical_features_mask = None
+
+        if proportion_features.shape[1] > 0:
+            proportion_features_mask = np.zeros(features.shape[1], dtype=bool)
+            proportion_features_mask[
+                numerical_features.shape[1]:numerical_features.shape[1] + proportion_features.shape[1]
+            ] = True
+        else:
+            proportion_features_mask = None
 
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
@@ -553,11 +634,14 @@ class Dataset:
         if numerical_features_mask is not None:
             numerical_features_mask = torch.tensor(numerical_features_mask)
 
+        if proportion_features_mask is not None:
+            proportion_features_mask = torch.tensor(proportion_features_mask)
+
         return (
             train_graph, train_features, train_targets, train_mask,
             val_graph, val_features, val_targets, val_mask,
             test_graph, test_features, test_targets, test_mask,
-            numerical_features_mask
+            numerical_features_mask, proportion_features_mask
         )
 
     @staticmethod

@@ -27,7 +27,9 @@ class ExperimentConfig:
     # Data preprocessing.
     regression_targets_transform: str = 'standard-scaler'
     numerical_features_transform: str = 'quantile-transform-normal'
+    proportion_features_transform: str = 'none'
     numerical_features_nan_imputation_strategy: str = 'most_frequent'
+    proportion_features_nan_imputation_strategy: str = 'most_frequent'
     use_node_embeddings: bool = False
 
     # PLR embeddings for numerical features.
@@ -104,10 +106,20 @@ def get_args():
                         choices=['none', 'standard-scaler', 'min-max-scaler', 'robust-scaler',
                                  'power-transform-yeo-johnson', 'quantile-transform-normal',
                                  'quantile-transform-uniform'],
-                        help='Only used for TabGraphs datasets that have numerical features.')
+                        help='Only used for TabGraphs datasets that have numerical features which are not also '
+                             'proportion features.')
+    parser.add_argument('--proportion_features_transform', nargs='+', type=str, default=None,
+                        choices=['none', 'standard-scaler', 'min-max-scaler', 'robust-scaler',
+                                 'power-transform-yeo-johnson', 'quantile-transform-normal',
+                                 'quantile-transform-uniform'],
+                        help='Only used for TabGraphs datasets that have proportion features.')
     parser.add_argument('--numerical_features_nan_imputation_strategy', nargs='+', type=str, default=None,
                         choices=['mean', 'median', 'most_frequent'],
-                        help='Only used for TabGraphs datasets that have NaNs in numerical features.')
+                        help='Only used for TabGraphs datasets that have NaNs in numerical features which are not also '
+                             'proportion features.')
+    parser.add_argument('--proportion_features_nan_imputation_strategy', nargs='+', type=str, default=None,
+                        choices=['mean', 'median', 'most_frequent'],
+                        help='Only used for TabGraphs datasets that have NaNs in proportion features.')
     parser.add_argument('--use_node_embeddings', nargs='+', type=str_to_bool, default=None,
                         help='DeepWalk node embeddings can be used for the city-roads-M and city-roads-L datasets '
                              '(where they are very beneficial).')
