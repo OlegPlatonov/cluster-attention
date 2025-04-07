@@ -84,7 +84,7 @@ def get_args():
     parser.add_argument('--save_dir', type=str, default=None, help='Base directory for saving information.')
     parser.add_argument('--dataset', type=str, default=None,
                         choices=['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-devices',
-                                 'city-reviews', 'city-roads-M', 'city-roads-L',
+                                 'city-reviews', 'city-roads-M', 'city-roads-L', 'twitch-churn', 'twitch-views',
                                  'tolokers-tab-old', 'questions-tab-old', 'city-reviews-old', 'browser-games-old',
                                  'hm-categories-old', 'web-fraud-old', 'city-roads-M-old', 'city-roads-L-old',
                                  'avazu-devices-old', 'hm-prices-old', 'web-traffic-old',
