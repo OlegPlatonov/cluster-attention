@@ -108,10 +108,10 @@ class Dataset:
             metric_name = 'accuracy'
             loss_fn = F.cross_entropy
             if transductive:
-                targets_dim = len(targets.unique())
+                targets_dim = len(targets[~targets.isnan()].unique())
                 targets = targets.to(torch.int64)
             else:
-                targets_dim = len(train_targets.unique())
+                targets_dim = len(train_targets[~train_targets.isnan()].unique())
                 train_targets = train_targets.to(torch.int64)
                 val_targets = val_targets.to(torch.int64)
                 test_targets = test_targets.to(torch.int64)
