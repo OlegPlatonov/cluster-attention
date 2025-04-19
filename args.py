@@ -91,7 +91,7 @@ def get_args():
                                  'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions',
                                  'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
                                  'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
-                                 'ogbn-arxiv', 'ogbn-products'])
+                                 'ogbn-arxiv', 'ogbn-products', 'tolokers-2', 'questions-2'])
     parser.add_argument('--split', type=str, default=None)
     parser.add_argument('--transductive', type=str_to_bool, default=None)
     parser.add_argument('--train_regime', type=str, default=None, choices=['full-graph', 'minibatch'])
