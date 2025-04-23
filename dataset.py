@@ -255,7 +255,8 @@ class Dataset:
         transform = self.transforms[transform_name]()
 
         if self.transductive:
-            transform.fit(self.targets_orig[:, None])
+            train_mask = self.train_mask.cpu().numpy()
+            transform.fit(self.targets_orig[train_mask, None])
             targets = transform.transform(self.targets_orig.copy()[:, None]).squeeze(1)
             self.targets = torch.tensor(targets, device=self.device)
 
