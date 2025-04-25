@@ -62,6 +62,7 @@ class ExperimentConfig:
 
     device: str = 'cuda:0'
     amp: bool = True
+    compile: bool = True
 
 
 def get_default_num_runs_value(dataset_name):
@@ -164,6 +165,7 @@ def get_args():
 
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--amp', type=str_to_bool, default=None)
+    parser.add_argument('--compile', type=str_to_bool, default=None)
 
     args = parser.parse_args()
 

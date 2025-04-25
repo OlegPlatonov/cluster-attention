@@ -103,4 +103,7 @@ def get_model(args, dataset):
 
     model.to(args.device)
 
+    if args.compile:
+        model.compile(dynamic=False, mode='default')
+
     return model
