@@ -8,6 +8,10 @@ from hparam_generators import get_hparam_generator
 from utils import update_hparams
 
 
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+
 def main():
     args = get_args()
 
