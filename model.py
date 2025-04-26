@@ -46,9 +46,12 @@ class Model(nn.Module):
         else:
             input_dim = features_dim
 
-        self.input_linear = nn.Linear(in_features=input_dim, out_features=hidden_dim)
-        self.dropout = nn.Dropout(p=dropout)
-        self.act = nn.GELU()
+        self.input_module = nn.Sequential(
+            nn.Linear(in_features=input_dim, out_features=hidden_dim),
+            nn.Dropout(p=dropout),
+            nn.GELU(),
+            nn.Linear(in_features=hidden_dim, out_features=hidden_dim)
+        )
 
         self.residual_modules = nn.ModuleList()
         for _ in range(num_layers):
@@ -72,9 +75,7 @@ class Model(nn.Module):
             x_numerical_embedded = self.plr_embeddings(x_numerical).flatten(start_dim=1)
             x = torch.cat([x_numerical_embedded, x[:, ~self.numerical_features_mask]], axis=1)
 
-        x = self.input_linear(x)
-        x = self.dropout(x)
-        x = self.act(x)
+        x = self.input_module(x)
 
         for residual_module in self.residual_modules:
             x = residual_module(graph, x)
