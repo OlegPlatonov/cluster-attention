@@ -62,6 +62,7 @@ class ExperimentConfig:
 
     device: str = 'cuda:0'
     amp: bool = True
+    amp_dgl: bool = True
     compile: bool = False
 
 
@@ -165,6 +166,10 @@ def get_args():
 
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--amp', type=str_to_bool, default=None)
+    parser.add_argument('--amp_dgl', type=str_to_bool, default=None,
+                        help='Can be set to False to disable amp for DGL operations which might otherwise produce NaNs '
+                             'or incorrect results for nodes with very high degrees. Only used for GCN and GraphSAGE '
+                             'models since other models do not have problems with amp.')
     parser.add_argument('--compile', type=str_to_bool, default=None)
 
     args = parser.parse_args()

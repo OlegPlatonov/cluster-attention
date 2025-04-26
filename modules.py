@@ -39,8 +39,10 @@ class FeedForwardModule(nn.Module):
 
 
 class GCNModule(nn.Module):
-    def __init__(self, dim, hidden_dim_multiplier=1, dropout=0, **kwargs):
+    def __init__(self, dim, hidden_dim_multiplier=1, dropout=0, amp_dgl=True, **kwargs):
         super().__init__()
+        self.amp_dgl = amp_dgl
+
         self.feed_forward_module = FeedForwardModule(dim=dim,
                                                      hidden_dim_multiplier=hidden_dim_multiplier,
                                                      dropout=dropout)
@@ -52,7 +54,8 @@ class GCNModule(nn.Module):
         degree_edge_products[degree_edge_products == 0] = 1
         norm_coefs = 1 / degree_edge_products.sqrt()
 
-        x = ops.u_mul_e_sum(graph, x, norm_coefs)
+        with torch.autocast(enabled=self.amp_dgl, device_type=graph.device.type):
+            x = ops.u_mul_e_sum(graph, x, norm_coefs)
 
         x = self.feed_forward_module(graph, x)
 
@@ -60,15 +63,19 @@ class GCNModule(nn.Module):
 
 
 class GraphSAGEModule(nn.Module):
-    def __init__(self, dim, hidden_dim_multiplier=1, dropout=0, **kwargs):
+    def __init__(self, dim, hidden_dim_multiplier=1, dropout=0, amp_dgl=True, **kwargs):
         super().__init__()
+        self.amp_dgl = amp_dgl
+
         self.feed_forward_module = FeedForwardModule(dim=dim,
                                                      num_inputs=2,
                                                      hidden_dim_multiplier=hidden_dim_multiplier,
                                                      dropout=dropout)
 
     def forward(self, graph, x):
-        message = ops.copy_u_mean(graph, x)
+        with torch.autocast(enabled=self.amp_dgl, device_type=graph.device.type):
+            message = ops.copy_u_mean(graph, x)
+
         x = torch.cat([x, message], axis=1)
 
         x = self.feed_forward_module(graph, x)

@@ -23,8 +23,8 @@ class Model(nn.Module):
     }
 
     def __init__(self, model_name, num_layers, features_dim, hidden_dim, output_dim, num_heads, hidden_dim_multiplier,
-                 normalization, dropout, use_plr, numerical_features_mask, plr_frequencies_dim, plr_frequencies_scale,
-                 plr_embedding_dim, use_plr_lite):
+                 normalization, dropout, amp_dgl, use_plr, numerical_features_mask, plr_frequencies_dim,
+                 plr_frequencies_scale, plr_embedding_dim, use_plr_lite):
         super().__init__()
 
         normalization = self.normalization[normalization]
@@ -58,7 +58,8 @@ class Model(nn.Module):
                                                         dim=hidden_dim,
                                                         hidden_dim_multiplier=hidden_dim_multiplier,
                                                         num_heads=num_heads,
-                                                        dropout=dropout)
+                                                        dropout=dropout,
+                                                        amp_dgl=amp_dgl)
 
                 self.residual_modules.append(residual_module)
 
@@ -94,6 +95,7 @@ def get_model(args, dataset):
                   hidden_dim_multiplier=args.hidden_dim_multiplier,
                   normalization=args.normalization,
                   dropout=args.dropout,
+                  amp_dgl=args.amp_dgl,
                   use_plr=args.plr,
                   numerical_features_mask=dataset.numerical_features_mask,
                   plr_frequencies_dim=args.plr_frequencies_dim,
