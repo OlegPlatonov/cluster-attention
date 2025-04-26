@@ -62,7 +62,7 @@ class ExperimentConfig:
 
     device: str = 'cuda:0'
     amp: bool = True
-    compile: bool = True
+    compile: bool = False
 
 
 def get_default_num_runs_value(dataset_name):
