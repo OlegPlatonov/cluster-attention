@@ -29,19 +29,24 @@ class Logger:
             num_finished_runs_with_best_hparams = 0
         else:
             num_finished_runs_with_best_hparams = self.results['main results']['num runs']
-            for run_id, (val_metric, test_metric, step) in enumerate(
+            for run_id, (val_metric, test_metric, step, successful) in enumerate(
                     zip(
                         self.results['main results'][f'val {self.metric_name} values'],
                         self.results['main results'][f'test {self.metric_name} values'],
-                        self.results['main results']['best steps']
+                        self.results['main results']['best steps'],
+                        self.results['main results']['successful']
                     ),
                     start=1
             ):
                 print(f'Run {run_id} finished during hparam search phase. '
                       f'Best val {self.metric_name}: {val_metric:.4f}, '
                       f'corresponding test {self.metric_name}: {test_metric:.4f} '
-                      f'(step {step}).'
-                      f'\n')
+                      f'(step {step}).')
+
+                if not successful:
+                    print('An error occured during the run!')
+
+                print()
 
         return num_finished_runs_with_best_hparams
 
@@ -106,6 +111,7 @@ class Logger:
         trial_results[f'val {self.metric_name} values'].append(run_results[f'val {self.metric_name}'])
         trial_results[f'test {self.metric_name} values'].append(run_results[f'test {self.metric_name}'])
         trial_results['best steps'].append(run_results['step'])
+        trial_results['successful'].append(run_results['successful'])
         trial_results[f'val {self.metric_name} mean'] = np.mean(
             trial_results[f'val {self.metric_name} values']
         ).item()
@@ -125,8 +131,12 @@ class Logger:
         print(f'Finished run {trial_results["num runs"]}. '
               f'Best val {self.metric_name}: {run_results[f"val {self.metric_name}"]:.4f}, '
               f'corresponding test {self.metric_name}: {run_results[f"test {self.metric_name}"]:.4f} '
-              f'(step {run_results["step"]}).'
-              f'\n')
+              f'(step {run_results["step"]}).')
+
+        if not run_results['successful']:
+            print('An error occured during the run!')
+
+        print()
 
     def _print_results_summary(self, results):
         if results['num runs'] <= 1:
@@ -161,5 +171,6 @@ class Logger:
             f'test {self.metric_name} std': None,
             f'val {self.metric_name} values': [],
             f'test {self.metric_name} values': [],
-            'best steps': []
+            'best steps': [],
+            'successful': []
         }
