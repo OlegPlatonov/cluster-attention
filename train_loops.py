@@ -73,10 +73,9 @@ def evaluate_full_graph_inductive(model, dataset, best_prev_val_metric, amp=Fals
 
 
 def update_results(results, new_metrics, metric_name, step):
-    if new_metrics[f'val {metric_name}'] > results[f'val {metric_name}']:
-        results[f'val {metric_name}'] = new_metrics[f'val {metric_name}']
-        results[f'test {metric_name}'] = new_metrics[f'test {metric_name}']
-        results['step'] = step
+    results[f'val {metric_name}'] = new_metrics[f'val {metric_name}']
+    results[f'test {metric_name}'] = new_metrics[f'test {metric_name}']
+    results['step'] = step
 
     return results
 
@@ -84,15 +83,26 @@ def update_results(results, new_metrics, metric_name, step):
 def train_full_graph_transductive(model, dataset, args, run_id):
     optimizer, gradscaler, scheduler = prepare_for_training(model=model, args=args)
     results = {f'val {dataset.metric_name}': 0, f'test {dataset.metric_name}': 0, 'step': None}
+    num_steps_without_val_improvement = 0
     with tqdm(total=args.max_steps, desc=f'Run {run_id}') as progress_bar:
         for step in range(1, args.max_steps + 1):
             train_step_full_graph_transductive(model=model, dataset=dataset, optimizer=optimizer, scheduler=scheduler,
                                                gradscaler=gradscaler, amp=args.amp)
             metrics = evaluate_full_graph_transductive(model=model, dataset=dataset, amp=args.amp)
-            results = update_results(results=results, new_metrics=metrics, metric_name=dataset.metric_name, step=step)
+
+            if metrics[f'val {dataset.metric_name}'] > results[f'val {dataset.metric_name}']:
+                results = update_results(results=results, new_metrics=metrics, metric_name=dataset.metric_name,
+                                         step=step)
+                num_steps_without_val_improvement = 0
+
+            else:
+                num_steps_without_val_improvement += 1
 
             progress_bar.update()
             progress_bar.set_postfix({metric: f'{value:.2f}' for metric, value in metrics.items()})
+
+            if num_steps_without_val_improvement == args.early_stopping:
+                break
 
     model.cpu()
     del model
@@ -103,6 +113,7 @@ def train_full_graph_transductive(model, dataset, args, run_id):
 def train_full_graph_inductive(model, dataset, args, run_id):
     optimizer, gradscaler, scheduler = prepare_for_training(model=model, args=args)
     results = {f'val {dataset.metric_name}': 0, f'test {dataset.metric_name}': 0, 'step': None}
+    num_steps_without_val_improvement = 0
     with tqdm(total=args.max_steps, desc=f'Run {run_id}') as progress_bar:
         for step in range(1, args.max_steps + 1):
             train_step_full_graph_inductive(model=model, dataset=dataset, optimizer=optimizer, scheduler=scheduler,
@@ -110,10 +121,20 @@ def train_full_graph_inductive(model, dataset, args, run_id):
             metrics = evaluate_full_graph_inductive(model=model, dataset=dataset,
                                                     best_prev_val_metric=results[f'val {dataset.metric_name}'],
                                                     amp=args.amp)
-            results = update_results(results=results, new_metrics=metrics, metric_name=dataset.metric_name, step=step)
+
+            if metrics[f'val {dataset.metric_name}'] > results[f'val {dataset.metric_name}']:
+                results = update_results(results=results, new_metrics=metrics, metric_name=dataset.metric_name,
+                                         step=step)
+                num_steps_without_val_improvement = 0
+
+            else:
+                num_steps_without_val_improvement += 1
 
             progress_bar.update()
             progress_bar.set_postfix({f'val {dataset.metric_name}': f'{metrics[f"val {dataset.metric_name}"]:.2f}'})
+
+            if num_steps_without_val_improvement == args.early_stopping:
+                break
 
     model.cpu()
     del model

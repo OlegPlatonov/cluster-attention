@@ -52,9 +52,10 @@ class ExperimentConfig:
     dropout: float = 0
     weight_decay: float = 0
 
-    max_steps: int = 1000
+    max_steps: int = 3000
     num_warmup_steps: int = None
     warmup_proportion: float = 0
+    early_stopping: int = 500
 
     num_runs_with_best_hparams: int = None
     num_runs_with_each_hparams: int = 1
@@ -158,6 +159,9 @@ def get_args():
                         help='If None, warmup_proportion is used instead.')
     parser.add_argument('--warmup_proportion', nargs='+', type=float, default=None,
                         help='Only used if num_warmup_steps is None.')
+    parser.add_argument('--early_stopping', nargs='+', type=int, default=None,
+                        help='Stop training after this many steps without improvement in validation metric. '
+                             'If -1, early stopping is disabled.')
 
     parser.add_argument('--num_runs_with_best_hparams', type=int, default=None,
                         help='If None, dataset-specific default values is used.')
