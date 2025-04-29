@@ -25,7 +25,7 @@ class Dataset:
     tabgraphs_old_datasets_names = ['tolokers-tab-old', 'questions-tab-old', 'city-reviews-old', 'browser-games-old',
                                     'hm-categories-old', 'web-fraud-old', 'city-roads-M-old', 'city-roads-L-old',
                                     'avazu-devices-old', 'hm-prices-old', 'web-traffic-old']
-    tabgraphs_datasets_names = ['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-devices',
+    tabgraphs_datasets_names = ['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-ctr',
                                 'city-reviews', 'city-roads-M', 'city-roads-L', 'twitch-churn', 'twitch-views',
                                 'pokec-regions', 'tolokers-2', 'questions-2', 'contentnet-exp', 'contentnet-views']
     pyg_datasets_names = ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer',
@@ -42,7 +42,7 @@ class Dataset:
     binary_classification_datasets_names = ['city-reviews', 'twitch-churn', 'tolokers-tab-old', 'questions-tab-old',
                                             'city-reviews-old', 'web-fraud-old', 'minesweeper', 'tolokers', 'questions',
                                             'tolokers-2', 'questions-2', 'contentnet-exp']
-    regression_datasets_names = ['hm-prices', 'games-ctr', 'avazu-devices', 'city-roads-M', 'city-roads-L',
+    regression_datasets_names = ['hm-prices', 'games-ctr', 'avazu-ctr', 'city-roads-M', 'city-roads-L',
                                  'twitch-views', 'city-roads-M-old', 'city-roads-L-old', 'avazu-devices-old',
                                  'hm-prices-old', 'web-traffic-old', 'contentnet-views']
 
