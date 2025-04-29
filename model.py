@@ -66,8 +66,12 @@ class Model(nn.Module):
 
                 self.residual_modules.append(residual_module)
 
-        self.output_normalization = normalization(hidden_dim)
-        self.output_linear = nn.Linear(in_features=hidden_dim, out_features=output_dim)
+        self.output_module = nn.Sequential(
+            normalization(hidden_dim),
+            nn.Linear(in_features=hidden_dim, out_features=hidden_dim),
+            nn.GELU(),
+            nn.Linear(in_features=hidden_dim, out_features=output_dim)
+        )
 
     def forward(self, graph, x):
         if self.use_plr:
@@ -80,8 +84,7 @@ class Model(nn.Module):
         for residual_module in self.residual_modules:
             x = residual_module(graph, x)
 
-        x = self.output_normalization(x)
-        x = self.output_linear(x).squeeze(1)
+        x = self.output_module(x).squeeze(1)
 
         return x
 
