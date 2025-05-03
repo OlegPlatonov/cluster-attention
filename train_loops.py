@@ -1,3 +1,4 @@
+from traceback import format_exc
 from tqdm import tqdm
 import torch
 from utils import get_parameter_groups, get_lr_scheduler_with_warmup
@@ -93,6 +94,8 @@ def train_full_graph_transductive(model, dataset, args, run_id):
 
             except Exception:
                 results['successful'] = False
+                exception_info_str = format_exc()
+                print(exception_info_str)
                 break
 
             if metrics[f'val {dataset.metric_name}'] > results[f'val {dataset.metric_name}']:
@@ -130,6 +133,8 @@ def train_full_graph_inductive(model, dataset, args, run_id):
 
             except Exception:
                 results['successful'] = False
+                exception_info_str = format_exc()
+                print(exception_info_str)
                 break
 
             if metrics[f'val {dataset.metric_name}'] > results[f'val {dataset.metric_name}']:
