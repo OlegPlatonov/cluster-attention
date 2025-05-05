@@ -27,7 +27,8 @@ class Dataset:
                                     'avazu-devices-old', 'hm-prices-old', 'web-traffic-old']
     tabgraphs_datasets_names = ['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-ctr',
                                 'city-reviews', 'city-roads-M', 'city-roads-L', 'twitch-churn', 'twitch-views',
-                                'pokec-regions', 'tolokers-2', 'questions-2', 'contentnet-exp', 'contentnet-views']
+                                'pokec-regions', 'tolokers-2', 'questions-2', 'contentnet-exp', 'contentnet-views',
+                                'artnet-exp', 'artnet-views', 'web-topics', 'web-fraud', 'web-traffic']
     pyg_datasets_names = ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer',
                           'pubmed', 'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo',
                           'lastfm-asia', 'facebook']
@@ -38,13 +39,13 @@ class Dataset:
                                                 'browser-games-old', 'hm-categories-old', 'roman-empire',
                                                 'amazon-ratings', 'cora', 'citeseer', 'pubmed', 'coauthor-cs',
                                                 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia',
-                                                'facebook', 'ogbn-arxiv', 'ogbn-products']
+                                                'facebook', 'ogbn-arxiv', 'ogbn-products', 'web-topics']
     binary_classification_datasets_names = ['city-reviews', 'twitch-churn', 'tolokers-tab-old', 'questions-tab-old',
                                             'city-reviews-old', 'web-fraud-old', 'minesweeper', 'tolokers', 'questions',
-                                            'tolokers-2', 'questions-2', 'contentnet-exp']
+                                            'tolokers-2', 'questions-2', 'contentnet-exp', 'artnet-exp', 'web-fraud']
     regression_datasets_names = ['hm-prices', 'games-ctr', 'avazu-ctr', 'city-roads-M', 'city-roads-L',
                                  'twitch-views', 'city-roads-M-old', 'city-roads-L-old', 'avazu-devices-old',
-                                 'hm-prices-old', 'web-traffic-old', 'contentnet-views']
+                                 'hm-prices-old', 'web-traffic-old', 'contentnet-views', 'artnet-views', 'web-traffic']
 
     # Not all datasets obtained from PyG have predefined data splits. Random class stratified splits will be used for
     # other datasets.

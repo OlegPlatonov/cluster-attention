@@ -95,7 +95,8 @@ def get_args():
                                  'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
                                  'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
                                  'ogbn-arxiv', 'ogbn-products', 'tolokers-2', 'questions-2', 'contentnet-exp',
-                                 'contentnet-views'])
+                                 'contentnet-views', 'artnet-exp', 'artnet-views', 'web-topics', 'web-fraud',
+                                 'web-traffic'])
     parser.add_argument('--split', type=str, default=None)
     parser.add_argument('--transductive', type=str_to_bool, default=None)
     parser.add_argument('--train_regime', type=str, default=None, choices=['full-graph', 'minibatch'])
