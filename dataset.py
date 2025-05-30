@@ -556,6 +556,11 @@ class Dataset:
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
+        split = np.load(f'data/{name}/split_{split}.npz')
+        train_mask_orig = split['train_mask']
+        val_mask_orig = split['val_mask']
+        test_mask_orig = split['test_mask']
+
         proportion_features_names_set = set(info['proportion_features_names'])
         numerical_features_names = [
             name for name in info['num_features_names'] if name not in proportion_features_names_set
@@ -568,8 +573,10 @@ class Dataset:
         targets = features_df[info['target_name']].values.astype(np.float32)
 
         if categorical_features.shape[1] > 0:
-            one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32)
-            categorical_features = one_hot_encoder.fit_transform(categorical_features)
+            one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32,
+                                            handle_unknown='ignore')
+            one_hot_encoder = one_hot_encoder.fit(categorical_features[train_mask_orig])
+            categorical_features = one_hot_encoder.transform(categorical_features)
 
         if use_node_embeddings:
             node_embeddings = np.load(f'data/{name}/node_embeddings.npz')['node_embeds']
@@ -594,11 +601,6 @@ class Dataset:
 
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
-
-        split = np.load(f'data/{name}/split_{split}.npz')
-        train_mask_orig = split['train_mask']
-        val_mask_orig = split['val_mask']
-        test_mask_orig = split['test_mask']
 
         train_and_val_mask_orig = (train_mask_orig | val_mask_orig)
 
