@@ -19,7 +19,7 @@ def main():
                       split=args.split,
                       transductive=args.transductive,
                       add_self_loops=(args.model in ['GCN', 'GAT', 'GT']),
-                      use_node_embeddings=args.use_node_embeddings,
+                      node_embeddings=args.node_embeddings,
                       device=args.device)
 
     train_fn = get_train_fn(train_regime=args.train_regime, transductive=dataset.transductive)

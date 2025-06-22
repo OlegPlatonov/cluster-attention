@@ -64,7 +64,7 @@ class Dataset:
                                               random_state=0, copy=False)
     }
 
-    def __init__(self, name, split=None, transductive=True, add_self_loops=False, use_node_embeddings=False,
+    def __init__(self, name, split=None, transductive=True, add_self_loops=False, node_embeddings=None,
                  regression_targets_transform='none', numerical_features_transform='none',
                  proportion_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
                  proportion_features_nan_imputation_strategy='most_frequent', device='cpu'):
@@ -72,7 +72,7 @@ class Dataset:
         if name in self.tabgraphs_old_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
                 self.get_tabgraphs_old_dataset(name=name, add_self_loops=add_self_loops,
-                                               use_node_embeddings=use_node_embeddings)
+                                               node_embeddings_name=node_embeddings)
             proportion_features_mask = None
 
         elif name in self.tabgraphs_datasets_names:
@@ -80,7 +80,7 @@ class Dataset:
                 (graph, features, targets, train_mask, val_mask, test_mask,
                  numerical_features_mask, proportion_features_mask) = \
                     self.get_tabgraphs_transductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
-                                                            use_node_embeddings=use_node_embeddings)
+                                                            node_embeddings_name=node_embeddings)
 
             else:
                 (train_graph, train_features, train_targets, train_mask,
@@ -88,7 +88,7 @@ class Dataset:
                  test_graph, test_features, test_targets, test_mask,
                  numerical_features_mask, proportion_features_mask) = \
                     self.get_tabgraphs_inductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
-                                                         use_node_embeddings=use_node_embeddings)
+                                                         node_embeddings_name=node_embeddings)
 
         elif name in self.pyg_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_pyg_dataset(
@@ -431,7 +431,7 @@ class Dataset:
         return test_metric
 
     @staticmethod
-    def get_tabgraphs_old_dataset(name, add_self_loops, use_node_embeddings):
+    def get_tabgraphs_old_dataset(name, add_self_loops, node_embeddings_name):
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
@@ -445,9 +445,6 @@ class Dataset:
             one_hot_encoder = OneHotEncoder(sparse_output=False, dtype=np.float32)
             categorical_features = one_hot_encoder.fit_transform(categorical_features)
 
-        if use_node_embeddings:
-            node_embeddings = np.load(f'data/{name}/node_embeddings.npz')['node_embeds']
-
         train_mask = pd.read_csv(f'data/{name}/train_mask.csv', index_col=0).values.squeeze(1)
         val_mask = pd.read_csv(f'data/{name}/valid_mask.csv', index_col=0).values.squeeze(1)
         test_mask = pd.read_csv(f'data/{name}/test_mask.csv', index_col=0).values.squeeze(1)
@@ -456,7 +453,9 @@ class Dataset:
         edges = edges_df.values[:, :2]
 
         features = np.concatenate([numerical_features, binary_features, categorical_features], axis=1)
-        if use_node_embeddings:
+
+        if node_embeddings_name is not None:
+            node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
             features = np.concatenate([features, node_embeddings], axis=1)
 
         if numerical_features.shape[1] > 0:
@@ -480,7 +479,7 @@ class Dataset:
         return graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask
 
     @staticmethod
-    def get_tabgraphs_transductive_dataset(name, split, add_self_loops, use_node_embeddings):
+    def get_tabgraphs_transductive_dataset(name, split, add_self_loops, node_embeddings_name):
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
@@ -499,11 +498,10 @@ class Dataset:
             one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32)
             categorical_features = one_hot_encoder.fit_transform(categorical_features)
 
-        if use_node_embeddings:
-            node_embeddings = np.load(f'data/{name}/node_embeddings.npz')['node_embeds']
-
         features = np.concatenate([numerical_features, proportion_features, categorical_features], axis=1)
-        if use_node_embeddings:
+
+        if node_embeddings_name is not None:
+            node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
             features = np.concatenate([features, node_embeddings], axis=1)
 
         if numerical_features.shape[1] > 0:
@@ -552,7 +550,7 @@ class Dataset:
         )
 
     @staticmethod
-    def get_tabgraphs_inductive_dataset(name, split, add_self_loops, use_node_embeddings):
+    def get_tabgraphs_inductive_dataset(name, split, add_self_loops, node_embeddings_name):
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
@@ -578,11 +576,10 @@ class Dataset:
             one_hot_encoder = one_hot_encoder.fit(categorical_features[train_mask_orig])
             categorical_features = one_hot_encoder.transform(categorical_features)
 
-        if use_node_embeddings:
-            node_embeddings = np.load(f'data/{name}/node_embeddings.npz')['node_embeds']
-
         features = np.concatenate([numerical_features, proportion_features, categorical_features], axis=1)
-        if use_node_embeddings:
+
+        if node_embeddings_name is not None:
+            node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
             features = np.concatenate([features, node_embeddings], axis=1)
 
         if numerical_features.shape[1] > 0:

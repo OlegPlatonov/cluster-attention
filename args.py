@@ -30,7 +30,7 @@ class ExperimentConfig:
     proportion_features_transform: str = 'none'
     numerical_features_nan_imputation_strategy: str = 'most_frequent'
     proportion_features_nan_imputation_strategy: str = 'most_frequent'
-    use_node_embeddings: bool = False
+    node_embeddings: str = None
 
     # PLR embeddings for numerical features.
     plr: bool = False
@@ -125,9 +125,8 @@ def get_args():
     parser.add_argument('--proportion_features_nan_imputation_strategy', nargs='+', type=str, default=None,
                         choices=['mean', 'median', 'most_frequent'],
                         help='Only used for TabGraphs datasets that have NaNs in proportion features.')
-    parser.add_argument('--use_node_embeddings', nargs='+', type=str_to_bool, default=None,
-                        help='DeepWalk node embeddings can be used for the city-roads-M and city-roads-L datasets '
-                             '(where they are very beneficial).')
+    parser.add_argument('--node_embeddings', nargs='+', type=str, default=None,
+                        help='Name of npy file containing node embeddings to use as additional node features.')
 
     # PLR embeddings for numerical features.
     parser.add_argument('--plr', nargs='+', type=str_to_bool, default=None,
