@@ -461,7 +461,7 @@ class Dataset:
         else:
             fraction_features_mask = None
 
-        targets = pd.read_csv(f'data/{name}/targets.csv', index_col=0).values.astype(np.float32)
+        targets = pd.read_csv(f'data/{name}/targets.csv', index_col=0).values.squeeze(1).astype(np.float32)
 
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
@@ -500,19 +500,19 @@ class Dataset:
             info = yaml.safe_load(file)
 
         split_masks = np.load(f'data/{name}/split_masks_{split}.npz')
-        train_mask_orig = split['train']
-        val_mask_orig = split['val']
-        test_mask_orig = split['test']
+        train_mask_orig = split_masks['train']
+        val_mask_orig = split_masks['val']
+        test_mask_orig = split_masks['test']
 
         fraction_features_names_set = set(info['fraction_features_names'])
         numerical_features_names = [
-            name for name in info['num_features_names'] if name not in fraction_features_names_set
+            name for name in info['numerical_features_names'] if name not in fraction_features_names_set
         ]
 
         features_df = pd.read_csv(f'data/{name}/features.csv', index_col=0)
         numerical_features = features_df[numerical_features_names].values.astype(np.float32)
         fraction_features = features_df[info['fraction_features_names']].values.astype(np.float32)
-        categorical_features = features_df[info['cat_features_names']].values.astype(np.float32)
+        categorical_features = features_df[info['categorical_features_names']].values.astype(np.float32)
 
         if categorical_features.shape[1] > 0:
             one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32,
@@ -540,7 +540,7 @@ class Dataset:
         else:
             fraction_features_mask = None
 
-        targets = pd.read_csv(f'data/{name}/targets.csv', index_col=0).values.astype(np.float32)
+        targets = pd.read_csv(f'data/{name}/targets.csv', index_col=0).values.squeeze(1).astype(np.float32)
 
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
