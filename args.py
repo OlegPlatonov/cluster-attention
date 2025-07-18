@@ -68,10 +68,10 @@ class ExperimentConfig:
 
 
 def get_default_num_runs_value(dataset_name):
-    if dataset_name in ['ogbn-arxiv', 'ogbn-products']:
-        return 10
-    else:
+    if dataset_name in ['pokec-regions', 'web-fraud', 'web-traffic', 'web-topics']:
         return 5
+    else:
+        return 10
 
 
 def get_args():
