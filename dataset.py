@@ -66,19 +66,19 @@ class Dataset:
 
     def __init__(self, name, split=None, transductive=True, add_self_loops=False, node_embeddings=None,
                  regression_targets_transform='none', numerical_features_transform='none',
-                 proportion_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
-                 proportion_features_nan_imputation_strategy='most_frequent', device='cpu'):
+                 fraction_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
+                 fraction_features_nan_imputation_strategy='most_frequent', device='cpu'):
         print('Preparing data...')
         if name in self.tabgraphs_old_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
                 self.get_tabgraphs_old_dataset(name=name, add_self_loops=add_self_loops,
                                                node_embeddings_name=node_embeddings)
-            proportion_features_mask = None
+            fraction_features_mask = None
 
         elif name in self.tabgraphs_datasets_names:
             if transductive:
                 (graph, features, targets, train_mask, val_mask, test_mask,
-                 numerical_features_mask, proportion_features_mask) = \
+                 numerical_features_mask, fraction_features_mask) = \
                     self.get_tabgraphs_transductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
                                                             node_embeddings_name=node_embeddings)
 
@@ -86,7 +86,7 @@ class Dataset:
                 (train_graph, train_features, train_targets, train_mask,
                  val_graph, val_features, val_targets, val_mask,
                  test_graph, test_features, test_targets, test_mask,
-                 numerical_features_mask, proportion_features_mask) = \
+                 numerical_features_mask, fraction_features_mask) = \
                     self.get_tabgraphs_inductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
                                                          node_embeddings_name=node_embeddings)
 
@@ -94,13 +94,13 @@ class Dataset:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_pyg_dataset(
                 name=name, add_self_loops=add_self_loops
             )
-            numerical_features_mask, proportion_features_mask = None, None
+            numerical_features_mask, fraction_features_mask = None, None
 
         elif name in self.ogb_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_ogb_dataset(
                 name=name, add_self_loops=add_self_loops
             )
-            numerical_features_mask, proportion_features_mask = None, None
+            numerical_features_mask, fraction_features_mask = None, None
 
         else:
             raise ValueError(f'Unkown dataset name: {name}.')
@@ -196,28 +196,28 @@ class Dataset:
                 self.val_numerical_features_orig = val_features[:, numerical_features_mask].clone().numpy()
                 self.test_numerical_features_orig = test_features[:, numerical_features_mask].clone().numpy()
 
-        if proportion_features_mask is None:
-            self.proportion_features_mask = None
+        if fraction_features_mask is None:
+            self.fraction_features_mask = None
         else:
-            self.proportion_features_mask = proportion_features_mask.to(device)
-            self.proportion_features_transform_name = None
-            self.proportion_features_nan_imputation_strategy = None
+            self.fraction_features_mask = fraction_features_mask.to(device)
+            self.fraction_features_transform_name = None
+            self.fraction_features_nan_imputation_strategy = None
             if transductive:
-                self.proportion_features_orig = features[:, proportion_features_mask].clone().numpy()
+                self.fraction_features_orig = features[:, fraction_features_mask].clone().numpy()
             else:
-                self.train_proportion_features_orig = train_features[:, proportion_features_mask].clone().numpy()
-                self.val_proportion_features_orig = val_features[:, proportion_features_mask].clone().numpy()
-                self.test_proportion_features_orig = test_features[:, proportion_features_mask].clone().numpy()
+                self.train_fraction_features_orig = train_features[:, fraction_features_mask].clone().numpy()
+                self.val_fraction_features_orig = val_features[:, fraction_features_mask].clone().numpy()
+                self.test_fraction_features_orig = test_features[:, fraction_features_mask].clone().numpy()
 
         self.apply_transforms(regression_targets_transform_name=regression_targets_transform,
                               numerical_features_transform_name=numerical_features_transform,
-                              proportion_features_transform_name=proportion_features_transform,
+                              fraction_features_transform_name=fraction_features_transform,
                               numerical_features_nan_imputation_strategy=numerical_features_nan_imputation_strategy,
-                              proportion_features_nan_imputation_strategy=proportion_features_nan_imputation_strategy)
+                              fraction_features_nan_imputation_strategy=fraction_features_nan_imputation_strategy)
 
     def apply_transforms(self, regression_targets_transform_name, numerical_features_transform_name,
-                         proportion_features_transform_name, numerical_features_nan_imputation_strategy,
-                         proportion_features_nan_imputation_strategy):
+                         fraction_features_transform_name, numerical_features_nan_imputation_strategy,
+                         fraction_features_nan_imputation_strategy):
         if self.task == 'regression' and regression_targets_transform_name != self.regression_targets_transform_name:
             self.transform_targets(transform_name=regression_targets_transform_name)
 
@@ -233,23 +233,23 @@ class Dataset:
                                     nan_imputation_strategy=numerical_features_nan_imputation_strategy)
 
         if (
-                self.proportion_features_mask is not None and
+                self.fraction_features_mask is not None and
                 (
-                        proportion_features_transform_name != self.proportion_features_transform_name or
-                        proportion_features_nan_imputation_strategy != self.proportion_features_nan_imputation_strategy
+                        fraction_features_transform_name != self.fraction_features_transform_name or
+                        fraction_features_nan_imputation_strategy != self.fraction_features_nan_imputation_strategy
                 )
         ):
-            self.transform_features(features_type='proportion',
-                                    transform_name=proportion_features_transform_name,
-                                    nan_imputation_strategy=proportion_features_nan_imputation_strategy)
+            self.transform_features(features_type='fraction',
+                                    transform_name=fraction_features_transform_name,
+                                    nan_imputation_strategy=fraction_features_nan_imputation_strategy)
 
     def apply_transforms_from_args(self, args):
         self.apply_transforms(
             regression_targets_transform_name=args.regression_targets_transform,
             numerical_features_transform_name=args.numerical_features_transform,
-            proportion_features_transform_name=args.proportion_features_transform,
+            fraction_features_transform_name=args.fraction_features_transform,
             numerical_features_nan_imputation_strategy=args.numerical_features_nan_imputation_strategy,
-            proportion_features_nan_imputation_strategy=args.proportion_features_nan_imputation_strategy
+            fraction_features_nan_imputation_strategy=args.fraction_features_nan_imputation_strategy
         )
 
     def transform_targets(self, transform_name):
@@ -281,21 +281,21 @@ class Dataset:
 
         if features_type == 'numerical':
             mask = self.numerical_features_mask
-        elif features_type == 'proportion':
-            mask = self.proportion_features_mask
+        elif features_type == 'fraction':
+            mask = self.fraction_features_mask
         else:
             raise ValueError(
-                f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+                f'Unknown features type: {features_type}. Supported values are "numerical" and "fraction".'
             )
 
         if self.transductive:
             if features_type == 'numerical':
                 features_orig = self.numerical_features_orig
-            elif features_type == 'proportion':
-                features_orig = self.proportion_features_orig
+            elif features_type == 'fraction':
+                features_orig = self.fraction_features_orig
             else:
                 raise ValueError(
-                    f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+                    f'Unknown features type: {features_type}. Supported values are "numerical" and "fraction".'
                 )
 
             transform.fit(features_orig)
@@ -312,13 +312,13 @@ class Dataset:
                 train_features_orig = self.train_numerical_features_orig
                 val_features_orig = self.val_numerical_features_orig
                 test_features_orig = self.test_numerical_features_orig
-            elif features_type == 'proportion':
-                train_features_orig = self.train_proportion_features_orig
-                val_features_orig = self.val_proportion_features_orig
-                test_features_orig = self.test_proportion_features_orig
+            elif features_type == 'fraction':
+                train_features_orig = self.train_fraction_features_orig
+                val_features_orig = self.val_fraction_features_orig
+                test_features_orig = self.test_fraction_features_orig
             else:
                 raise ValueError(
-                    f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+                    f'Unknown features type: {features_type}. Supported values are "numerical" and "fraction".'
                 )
 
             transform.fit(train_features_orig)
@@ -339,12 +339,12 @@ class Dataset:
         if features_type == 'numerical':
             self.numerical_features_transform_name = transform_name
             self.numerical_features_nan_imputation_strategy = nan_imputation_strategy
-        elif features_type == 'proportion':
-            self.proportion_features_transform_name = transform_name
-            self.proportion_features_nan_imputation_strategy = nan_imputation_strategy
+        elif features_type == 'fraction':
+            self.fraction_features_transform_name = transform_name
+            self.fraction_features_nan_imputation_strategy = nan_imputation_strategy
         else:
             raise ValueError(
-                f'Unknown features type: {features_type}. Supported values are "numerical" and "proportion".'
+                f'Unknown features type: {features_type}. Supported values are "numerical" and "fraction".'
             )
 
     def compute_metrics_transductive(self, preds):
@@ -483,22 +483,21 @@ class Dataset:
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
-        proportion_features_names_set = set(info['proportion_features_names'])
+        fraction_features_names_set = set(info['fraction_features_names'])
         numerical_features_names = [
-            name for name in info['num_features_names'] if name not in proportion_features_names_set
+            name for name in info['numerical_features_names'] if name not in fraction_features_names_set
         ]
 
         features_df = pd.read_csv(f'data/{name}/features.csv', index_col=0)
         numerical_features = features_df[numerical_features_names].values.astype(np.float32)
-        proportion_features = features_df[info['proportion_features_names']].values.astype(np.float32)
-        categorical_features = features_df[info['cat_features_names']].values.astype(np.float32)
-        targets = features_df[info['target_name']].values.astype(np.float32)
+        fraction_features = features_df[info['fraction_features_names']].values.astype(np.float32)
+        categorical_features = features_df[info['categorical_features_names']].values.astype(np.float32)
 
         if categorical_features.shape[1] > 0:
             one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32)
             categorical_features = one_hot_encoder.fit_transform(categorical_features)
 
-        features = np.concatenate([numerical_features, proportion_features, categorical_features], axis=1)
+        features = np.concatenate([numerical_features, fraction_features, categorical_features], axis=1)
 
         if node_embeddings_name is not None:
             node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
@@ -510,21 +509,23 @@ class Dataset:
         else:
             numerical_features_mask = None
 
-        if proportion_features.shape[1] > 0:
-            proportion_features_mask = np.zeros(features.shape[1], dtype=bool)
-            proportion_features_mask[
-                numerical_features.shape[1]:numerical_features.shape[1] + proportion_features.shape[1]
+        if fraction_features.shape[1] > 0:
+            fraction_features_mask = np.zeros(features.shape[1], dtype=bool)
+            fraction_features_mask[
+                numerical_features.shape[1]:numerical_features.shape[1] + fraction_features.shape[1]
             ] = True
         else:
-            proportion_features_mask = None
+            fraction_features_mask = None
+
+        targets = pd.read_csv(f'data/{name}/targets.csv', index_col=0).values.astype(np.float32)
 
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
 
-        split = np.load(f'data/{name}/split_{split}.npz')
-        train_mask_orig = split['train_mask']
-        val_mask_orig = split['val_mask']
-        test_mask_orig = split['test_mask']
+        split_masks = np.load(f'data/{name}/split_masks_{split}.npz')
+        train_mask_orig = split_masks['train']
+        val_mask_orig = split_masks['val']
+        test_mask_orig = split_masks['test']
 
         labeled_mask = ~np.isnan(targets)
         train_mask = (train_mask_orig & labeled_mask)
@@ -542,11 +543,11 @@ class Dataset:
         if numerical_features_mask is not None:
             numerical_features_mask = torch.tensor(numerical_features_mask)
 
-        if proportion_features_mask is not None:
-            proportion_features_mask = torch.tensor(proportion_features_mask)
+        if fraction_features_mask is not None:
+            fraction_features_mask = torch.tensor(fraction_features_mask)
 
         return (
-            graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask, proportion_features_mask
+            graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask, fraction_features_mask
         )
 
     @staticmethod
@@ -554,21 +555,20 @@ class Dataset:
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
-        split = np.load(f'data/{name}/split_{split}.npz')
-        train_mask_orig = split['train_mask']
-        val_mask_orig = split['val_mask']
-        test_mask_orig = split['test_mask']
+        split_masks = np.load(f'data/{name}/split_masks_{split}.npz')
+        train_mask_orig = split['train']
+        val_mask_orig = split['val']
+        test_mask_orig = split['test']
 
-        proportion_features_names_set = set(info['proportion_features_names'])
+        fraction_features_names_set = set(info['fraction_features_names'])
         numerical_features_names = [
-            name for name in info['num_features_names'] if name not in proportion_features_names_set
+            name for name in info['num_features_names'] if name not in fraction_features_names_set
         ]
 
         features_df = pd.read_csv(f'data/{name}/features.csv', index_col=0)
         numerical_features = features_df[numerical_features_names].values.astype(np.float32)
-        proportion_features = features_df[info['proportion_features_names']].values.astype(np.float32)
+        fraction_features = features_df[info['fraction_features_names']].values.astype(np.float32)
         categorical_features = features_df[info['cat_features_names']].values.astype(np.float32)
-        targets = features_df[info['target_name']].values.astype(np.float32)
 
         if categorical_features.shape[1] > 0:
             one_hot_encoder = OneHotEncoder(drop='if_binary', sparse_output=False, dtype=np.float32,
@@ -576,7 +576,7 @@ class Dataset:
             one_hot_encoder = one_hot_encoder.fit(categorical_features[train_mask_orig])
             categorical_features = one_hot_encoder.transform(categorical_features)
 
-        features = np.concatenate([numerical_features, proportion_features, categorical_features], axis=1)
+        features = np.concatenate([numerical_features, fraction_features, categorical_features], axis=1)
 
         if node_embeddings_name is not None:
             node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
@@ -588,13 +588,15 @@ class Dataset:
         else:
             numerical_features_mask = None
 
-        if proportion_features.shape[1] > 0:
-            proportion_features_mask = np.zeros(features.shape[1], dtype=bool)
-            proportion_features_mask[
-                numerical_features.shape[1]:numerical_features.shape[1] + proportion_features.shape[1]
+        if fraction_features.shape[1] > 0:
+            fraction_features_mask = np.zeros(features.shape[1], dtype=bool)
+            fraction_features_mask[
+                numerical_features.shape[1]:numerical_features.shape[1] + fraction_features.shape[1]
             ] = True
         else:
-            proportion_features_mask = None
+            fraction_features_mask = None
+
+        targets = pd.read_csv(f'data/{name}/targets.csv', index_col=0).values.astype(np.float32)
 
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
@@ -637,14 +639,14 @@ class Dataset:
         if numerical_features_mask is not None:
             numerical_features_mask = torch.tensor(numerical_features_mask)
 
-        if proportion_features_mask is not None:
-            proportion_features_mask = torch.tensor(proportion_features_mask)
+        if fraction_features_mask is not None:
+            fraction_features_mask = torch.tensor(fraction_features_mask)
 
         return (
             train_graph, train_features, train_targets, train_mask,
             val_graph, val_features, val_targets, val_mask,
             test_graph, test_features, test_targets, test_mask,
-            numerical_features_mask, proportion_features_mask
+            numerical_features_mask, fraction_features_mask
         )
 
     @staticmethod

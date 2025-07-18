@@ -27,9 +27,9 @@ class ExperimentConfig:
     # Data preprocessing.
     regression_targets_transform: str = 'standard-scaler'
     numerical_features_transform: str = 'quantile-transform-normal'
-    proportion_features_transform: str = 'none'
+    fraction_features_transform: str = 'none'
     numerical_features_nan_imputation_strategy: str = 'most_frequent'
-    proportion_features_nan_imputation_strategy: str = 'most_frequent'
+    fraction_features_nan_imputation_strategy: str = 'most_frequent'
     node_embeddings: str = None
 
     # PLR embeddings for numerical features.
@@ -112,19 +112,19 @@ def get_args():
                                  'power-transform-yeo-johnson', 'quantile-transform-normal',
                                  'quantile-transform-uniform'],
                         help='Only used for TabGraphs datasets that have numerical features which are not also '
-                             'proportion features.')
-    parser.add_argument('--proportion_features_transform', nargs='+', type=str, default=None,
+                             'fraction features.')
+    parser.add_argument('--fraction_features_transform', nargs='+', type=str, default=None,
                         choices=['none', 'standard-scaler', 'min-max-scaler', 'robust-scaler',
                                  'power-transform-yeo-johnson', 'quantile-transform-normal',
                                  'quantile-transform-uniform'],
-                        help='Only used for TabGraphs datasets that have proportion features.')
+                        help='Only used for TabGraphs datasets that have fraction features.')
     parser.add_argument('--numerical_features_nan_imputation_strategy', nargs='+', type=str, default=None,
                         choices=['mean', 'median', 'most_frequent'],
                         help='Only used for TabGraphs datasets that have NaNs in numerical features which are not also '
-                             'proportion features.')
-    parser.add_argument('--proportion_features_nan_imputation_strategy', nargs='+', type=str, default=None,
+                             'fraction features.')
+    parser.add_argument('--fraction_features_nan_imputation_strategy', nargs='+', type=str, default=None,
                         choices=['mean', 'median', 'most_frequent'],
-                        help='Only used for TabGraphs datasets that have NaNs in proportion features.')
+                        help='Only used for TabGraphs datasets that have NaNs in fraction features.')
     parser.add_argument('--node_embeddings', nargs='+', type=str, default=None,
                         help='Name of npy file containing node embeddings to use as additional node features.')
 
