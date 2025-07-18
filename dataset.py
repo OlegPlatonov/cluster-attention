@@ -20,32 +20,30 @@ from ogb.nodeproppred import NodePropPredDataset
 
 class Dataset:
     # Datasets by source.
-    # Automatic downloading is currently not supported for TabGraphs datasets. If you want to use one of these datasets,
+    # Automatic downloading is currently not supported for GraphLand datasets. If you want to use one of these datasets,
     # put it in the data directory.
-    tabgraphs_old_datasets_names = ['tolokers-tab-old', 'questions-tab-old', 'city-reviews-old', 'browser-games-old',
-                                    'hm-categories-old', 'web-fraud-old', 'city-roads-M-old', 'city-roads-L-old',
-                                    'avazu-devices-old', 'hm-prices-old', 'web-traffic-old']
-    tabgraphs_datasets_names = ['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-ctr',
-                                'city-reviews', 'city-roads-M', 'city-roads-L', 'twitch-churn', 'twitch-views',
-                                'pokec-regions', 'tolokers-2', 'questions-2', 'contentnet-exp', 'contentnet-views',
-                                'artnet-exp', 'artnet-views', 'web-topics', 'web-fraud', 'web-traffic']
-    pyg_datasets_names = ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer',
-                          'pubmed', 'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo',
-                          'lastfm-asia', 'facebook']
+    graphland_datasets_names = [
+        'hm-categories', 'hm-prices', 'avazu-ctr', 'tolokers-2', 'artnet-views', 'artnet-exp', 'twitch-views',
+        'city-roads-M', 'city-roads-L', 'city-reviews', 'pokec-regions', 'web-fraud', 'web-traffic', 'web-topics'
+    ]
+    pyg_datasets_names = [
+        'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer', 'pubmed',
+        'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook'
+    ]
     ogb_datasets_names = ['ogbn-arxiv', 'ogbn-products']
 
     # Datasets by task.
-    multiclass_classification_datasets_names = ['hm-categories', 'games-categories', 'pokec-regions',
-                                                'browser-games-old', 'hm-categories-old', 'roman-empire',
-                                                'amazon-ratings', 'cora', 'citeseer', 'pubmed', 'coauthor-cs',
-                                                'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia',
-                                                'facebook', 'ogbn-arxiv', 'ogbn-products', 'web-topics']
-    binary_classification_datasets_names = ['city-reviews', 'twitch-churn', 'tolokers-tab-old', 'questions-tab-old',
-                                            'city-reviews-old', 'web-fraud-old', 'minesweeper', 'tolokers', 'questions',
-                                            'tolokers-2', 'questions-2', 'contentnet-exp', 'artnet-exp', 'web-fraud']
-    regression_datasets_names = ['hm-prices', 'games-ctr', 'avazu-ctr', 'city-roads-M', 'city-roads-L',
-                                 'twitch-views', 'city-roads-M-old', 'city-roads-L-old', 'avazu-devices-old',
-                                 'hm-prices-old', 'web-traffic-old', 'contentnet-views', 'artnet-views', 'web-traffic']
+    multiclass_classification_datasets_names = [
+        'hm-categories', 'pokec-regions', 'web-topics', 'roman-empire', 'amazon-ratings', 'cora', 'citeseer', 'pubmed',
+        'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
+        'ogbn-arxiv', 'ogbn-products'
+    ]
+    binary_classification_datasets_names = [
+        'tolokers-2', 'artnet-exp', 'city-reviews', 'web-fraud', 'minesweeper', 'tolokers', 'questions',
+    ]
+    regression_datasets_names = [
+        'hm-prices', 'avazu-ctr', 'artnet-views', 'twitch-views', 'city-roads-M', 'city-roads-L', 'web-traffic'
+    ]
 
     # Not all datasets obtained from PyG have predefined data splits. Random class stratified splits will be used for
     # other datasets.
@@ -69,17 +67,11 @@ class Dataset:
                  fraction_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
                  fraction_features_nan_imputation_strategy='most_frequent', device='cpu'):
         print('Preparing data...')
-        if name in self.tabgraphs_old_datasets_names:
-            graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask = \
-                self.get_tabgraphs_old_dataset(name=name, add_self_loops=add_self_loops,
-                                               node_embeddings_name=node_embeddings)
-            fraction_features_mask = None
-
-        elif name in self.tabgraphs_datasets_names:
+        if name in self.graphland_datasets_names:
             if transductive:
                 (graph, features, targets, train_mask, val_mask, test_mask,
                  numerical_features_mask, fraction_features_mask) = \
-                    self.get_tabgraphs_transductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
+                    self.get_graphland_transductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
                                                             node_embeddings_name=node_embeddings)
 
             else:
@@ -87,7 +79,7 @@ class Dataset:
                  val_graph, val_features, val_targets, val_mask,
                  test_graph, test_features, test_targets, test_mask,
                  numerical_features_mask, fraction_features_mask) = \
-                    self.get_tabgraphs_inductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
+                    self.get_graphland_inductive_dataset(name=name, split=split, add_self_loops=add_self_loops,
                                                          node_embeddings_name=node_embeddings)
 
         elif name in self.pyg_datasets_names:
@@ -431,55 +423,7 @@ class Dataset:
         return test_metric
 
     @staticmethod
-    def get_tabgraphs_old_dataset(name, add_self_loops, node_embeddings_name):
-        with open(f'data/{name}/info.yaml', 'r') as file:
-            info = yaml.safe_load(file)
-
-        features_df = pd.read_csv(f'data/{name}/features.csv', index_col=0)
-        numerical_features = features_df[info['num_feature_names']].values.astype(np.float32)
-        binary_features = features_df[info['bin_feature_names']].values.astype(np.float32)
-        categorical_features = features_df[info['cat_feature_names']].values.astype(np.float32)
-        targets = features_df[info['target_name']].values.astype(np.float32)
-
-        if categorical_features.shape[1] > 0:
-            one_hot_encoder = OneHotEncoder(sparse_output=False, dtype=np.float32)
-            categorical_features = one_hot_encoder.fit_transform(categorical_features)
-
-        train_mask = pd.read_csv(f'data/{name}/train_mask.csv', index_col=0).values.squeeze(1)
-        val_mask = pd.read_csv(f'data/{name}/valid_mask.csv', index_col=0).values.squeeze(1)
-        test_mask = pd.read_csv(f'data/{name}/test_mask.csv', index_col=0).values.squeeze(1)
-
-        edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
-        edges = edges_df.values[:, :2]
-
-        features = np.concatenate([numerical_features, binary_features, categorical_features], axis=1)
-
-        if node_embeddings_name is not None:
-            node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
-            features = np.concatenate([features, node_embeddings], axis=1)
-
-        if numerical_features.shape[1] > 0:
-            numerical_features_mask = np.zeros(features.shape[1], dtype=bool)
-            numerical_features_mask[:numerical_features.shape[1]] = True
-        else:
-            numerical_features_mask = None
-
-        features = torch.tensor(features)
-        targets = torch.tensor(targets)
-
-        if numerical_features_mask is not None:
-            numerical_features_mask = torch.tensor(numerical_features_mask)
-
-        graph = Dataset.get_graph(edges=edges, num_nodes=len(features), add_self_loops=add_self_loops)
-
-        train_mask = torch.tensor(train_mask)
-        val_mask = torch.tensor(val_mask)
-        test_mask = torch.tensor(test_mask)
-
-        return graph, features, targets, train_mask, val_mask, test_mask, numerical_features_mask
-
-    @staticmethod
-    def get_tabgraphs_transductive_dataset(name, split, add_self_loops, node_embeddings_name):
+    def get_graphland_transductive_dataset(name, split, add_self_loops, node_embeddings_name):
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
@@ -551,7 +495,7 @@ class Dataset:
         )
 
     @staticmethod
-    def get_tabgraphs_inductive_dataset(name, split, add_self_loops, node_embeddings_name):
+    def get_graphland_inductive_dataset(name, split, add_self_loops, node_embeddings_name):
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 

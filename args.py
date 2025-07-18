@@ -18,7 +18,7 @@ def str_to_bool(string):
 class ExperimentConfig:
     name: str = 'experiment'
     save_dir: str = 'experiments'
-    dataset: str = 'tolokers-tab'
+    dataset: str = 'tolokers-2'
     split: str = 'RH'
     transductive: bool = True
     train_regime: str = 'full-graph'
@@ -86,17 +86,19 @@ def get_args():
     parser.add_argument('--name', type=str, default=None, help='Experiment name.')
     parser.add_argument('--save_dir', type=str, default=None, help='Base directory for saving information.')
     parser.add_argument('--dataset', type=str, default=None,
-                        choices=['hm-categories', 'hm-prices', 'games-categories', 'games-ctr', 'avazu-ctr',
-                                 'city-reviews', 'city-roads-M', 'city-roads-L', 'twitch-churn', 'twitch-views',
-                                 'pokec-regions', 'tolokers-tab-old', 'questions-tab-old', 'city-reviews-old',
-                                 'browser-games-old', 'hm-categories-old', 'web-fraud-old', 'city-roads-M-old',
-                                 'city-roads-L-old', 'avazu-devices-old', 'hm-prices-old', 'web-traffic-old',
-                                 'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions',
-                                 'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
-                                 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
-                                 'ogbn-arxiv', 'ogbn-products', 'tolokers-2', 'questions-2', 'contentnet-exp',
-                                 'contentnet-views', 'artnet-exp', 'artnet-views', 'web-topics', 'web-fraud',
-                                 'web-traffic'])
+                        choices=[
+                            # GraphLand datasets
+                            'hm-categories', 'hm-prices', 'avazu-ctr', 'tolokers-2', 'artnet-views', 'artnet-exp',
+                            'twitch-views', 'city-roads-M', 'city-roads-L', 'city-reviews', 'pokec-regions',
+                            'web-fraud', 'web-traffic', 'web-topics',
+                            # Heterophilous graphs benchmark datasets
+                            'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions',
+                            # Classic datasets
+                            'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
+                            'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
+                            # OGB datasets
+                            'ogbn-arxiv', 'ogbn-products'
+                        ])
     parser.add_argument('--split', type=str, default=None)
     parser.add_argument('--transductive', type=str_to_bool, default=None)
     parser.add_argument('--train_regime', type=str, default=None, choices=['full-graph', 'minibatch'])
@@ -106,31 +108,33 @@ def get_args():
     parser.add_argument('--regression_targets_transform', nargs='+', type=str, default=None,
                         choices=['none', 'standard-scaler', 'min-max-scaler', 'robust-scaler',
                                  'power-transform-yeo-johnson', 'quantile-transform-normal',
-                                 'quantile-transform-uniform'])
+                                 'quantile-transform-uniform'],
+                        help='Only used for regression datasets.')
     parser.add_argument('--numerical_features_transform', nargs='+', type=str, default=None,
                         choices=['none', 'standard-scaler', 'min-max-scaler', 'robust-scaler',
                                  'power-transform-yeo-johnson', 'quantile-transform-normal',
                                  'quantile-transform-uniform'],
-                        help='Only used for TabGraphs datasets that have numerical features which are not also '
+                        help='Only used for GraphLand datasets that have numerical features which are not also '
                              'fraction features.')
     parser.add_argument('--fraction_features_transform', nargs='+', type=str, default=None,
                         choices=['none', 'standard-scaler', 'min-max-scaler', 'robust-scaler',
                                  'power-transform-yeo-johnson', 'quantile-transform-normal',
                                  'quantile-transform-uniform'],
-                        help='Only used for TabGraphs datasets that have fraction features.')
+                        help='Only used for GraphLand datasets that have fraction features.')
     parser.add_argument('--numerical_features_nan_imputation_strategy', nargs='+', type=str, default=None,
                         choices=['mean', 'median', 'most_frequent'],
-                        help='Only used for TabGraphs datasets that have NaNs in numerical features which are not also '
+                        help='Only used for GraphLand datasets that have NaNs in numerical features which are not also '
                              'fraction features.')
     parser.add_argument('--fraction_features_nan_imputation_strategy', nargs='+', type=str, default=None,
                         choices=['mean', 'median', 'most_frequent'],
-                        help='Only used for TabGraphs datasets that have NaNs in fraction features.')
+                        help='Only used for GraphLand datasets that have NaNs in fraction features.')
     parser.add_argument('--node_embeddings', nargs='+', type=str, default=None,
                         help='Name of npy file containing node embeddings to use as additional node features.')
 
     # PLR embeddings for numerical features.
     parser.add_argument('--plr', nargs='+', type=str_to_bool, default=None,
-                        help='Use PLR embeddings for numerical features. Can only be used for TabGraphs datasets.')
+                        help='Use PLR embeddings for numerical features which are not also fraction features. '
+                             'Can only be used for GraphLand datasets.')
     parser.add_argument('--plr_frequencies_dim', nargs='+', type=int, default=None,
                         help='Only used if plr is True.')
     parser.add_argument('--plr_frequencies_scale', nargs='+', type=float, default=None,
@@ -147,7 +151,8 @@ def get_args():
     parser.add_argument('--hidden_dim', nargs='+', type=int, default=None)
     parser.add_argument('--num_heads', nargs='+', type=int, default=None)
     parser.add_argument('--hidden_dim_multiplier', nargs='+', type=float, default=None)
-    parser.add_argument('--normalization', nargs='+', type=str, default=None, choices=['none', 'layernorm', 'batchnorm'])
+    parser.add_argument('--normalization', nargs='+', type=str, default=None,
+                        choices=['none', 'layernorm', 'batchnorm'])
 
     # Training hyperparameters.
     parser.add_argument('--lr', nargs='+', type=float, default=None)
