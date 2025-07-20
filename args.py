@@ -52,10 +52,10 @@ class ExperimentConfig:
     dropout: float = 0
     weight_decay: float = 0
 
-    max_steps: int = 3000
+    max_steps: int = 1000
     num_warmup_steps: int = None
     warmup_proportion: float = 0
-    early_stopping: int = 500
+    early_stopping: int = -1
 
     num_runs_with_best_hparams: int = None
     num_runs_with_each_hparams: int = 1
