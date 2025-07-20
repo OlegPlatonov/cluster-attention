@@ -2,7 +2,7 @@ name: gnn
 channels:
   - pytorch
   - nvidia
-  - dglteam/label/th24_cu121
+  - dglteam/label/th24_cu124
 dependencies:
   - python=3.11
   - pip=24.2
@@ -13,8 +13,8 @@ dependencies:
   - numpy=1.26
   - pandas=2.2
   - scikit-learn=1.5
-  - pytorch=2.4.0
-  - pytorch-cuda=12.1
+  - pytorch=2.5.1
+  - pytorch-cuda=12.4
   - torchdata=0.7
   - dgl=2.4
   - pip:
