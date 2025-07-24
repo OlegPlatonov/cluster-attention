@@ -25,7 +25,9 @@ class BaseHparamGenerator(ABC):
 class GridSearchHparamGenerator(BaseHparamGenerator):
     def __init__(self, args):
         # Get hparams that have multiple values.
-        hparam_lists = {key: value for key, value in vars(args).items() if isinstance(value, (list, tuple))}
+        hparam_lists = {
+            key: value for key, value in vars(args).items() if isinstance(value, (list, tuple)) and key != 'clusterings'
+        }
 
         # Dict of lists to list of dicts.
         hparam_values = product(*hparam_lists.values())
