@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from modules import (ResidualModuleWrapper, FeedForwardModule, GCNModule, GraphSAGEModule, GATModule, GATSepModule,
-                     TransformerAttentionModule, TransformerAttentionSepModule)
+                     TransformerAttentionModule, TransformerAttentionSepModule, ClusterAttentionModule)
 from plr_embeddings import PLREmbeddings
 
 
@@ -13,7 +13,8 @@ class Model(nn.Module):
         'GAT': [GATModule],
         'GAT-sep': [GATSepModule],
         'GT': [TransformerAttentionModule, FeedForwardModule],
-        'GT-sep': [TransformerAttentionSepModule, FeedForwardModule]
+        'GT-sep': [TransformerAttentionSepModule, FeedForwardModule],
+        'McGT': [ClusterAttentionModule, FeedForwardModule]
     }
 
     normalization = {
@@ -22,9 +23,9 @@ class Model(nn.Module):
         'batchnorm': nn.BatchNorm1d
     }
 
-    def __init__(self, model_name, num_layers, features_dim, hidden_dim, output_dim, num_heads, hidden_dim_multiplier,
-                 normalization, dropout, amp_dgl, use_plr, numerical_features_mask, plr_frequencies_dim,
-                 plr_frequencies_scale, plr_embedding_dim, use_plr_lite):
+    def __init__(self, model_name, num_layers, features_dim, hidden_dim, output_dim, num_clusterings, attn_dim,
+                 num_heads, hidden_dim_multiplier, normalization, dropout, amp_dgl, use_plr, numerical_features_mask,
+                 plr_frequencies_dim, plr_frequencies_scale, plr_embedding_dim, use_plr_lite):
         super().__init__()
 
         normalization = self.normalization[normalization]
@@ -60,6 +61,8 @@ class Model(nn.Module):
                                                         normalization=normalization,
                                                         dim=hidden_dim,
                                                         hidden_dim_multiplier=hidden_dim_multiplier,
+                                                        num_clusterings=num_clusterings,
+                                                        attn_dim=attn_dim,
                                                         num_heads=num_heads,
                                                         dropout=dropout,
                                                         amp_dgl=amp_dgl)
@@ -73,7 +76,7 @@ class Model(nn.Module):
             nn.Linear(in_features=hidden_dim, out_features=output_dim)
         )
 
-    def forward(self, graph, x):
+    def forward(self, graph, x, **kwargs):
         if self.use_plr:
             x_numerical = x[:, self.numerical_features_mask]
             x_numerical_embedded = self.plr_embeddings(x_numerical).flatten(start_dim=1)
@@ -82,7 +85,7 @@ class Model(nn.Module):
         x = self.input_module(x)
 
         for residual_module in self.residual_modules:
-            x = residual_module(graph, x)
+            x = residual_module(graph, x, **kwargs)
 
         x = self.output_module(x).squeeze(1)
 
@@ -95,6 +98,8 @@ def get_model(args, dataset):
                   features_dim=dataset.features_dim,
                   hidden_dim=args.hidden_dim,
                   output_dim=dataset.targets_dim,
+                  num_clusterings=len(args.clusterings) if args.clusterings is not None else 0,
+                  attn_dim=args.attn_dim,
                   num_heads=args.num_heads,
                   hidden_dim_multiplier=args.hidden_dim_multiplier,
                   normalization=args.normalization,

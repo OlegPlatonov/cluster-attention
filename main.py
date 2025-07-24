@@ -20,6 +20,9 @@ def main():
                       transductive=args.transductive,
                       add_self_loops=(args.model in ['GCN', 'GAT', 'GT']),
                       node_embeddings=args.node_embeddings,
+                      clusterings=args.clusterings,
+                      min_cluster_size=args.min_cluster_size,
+                      max_cluster_size=args.max_cluster_size,
                       device=args.device)
 
     train_fn = get_train_fn(train_regime=args.train_regime, transductive=dataset.transductive)

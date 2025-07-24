@@ -18,7 +18,7 @@ def train_step_full_graph_transductive(model, dataset, optimizer, scheduler, gra
     model.train()
 
     with torch.autocast(enabled=amp, device_type=dataset.graph.device.type):
-        preds = model(graph=dataset.graph, x=dataset.features)
+        preds = model(graph=dataset.graph, x=dataset.features, clusterings=dataset.clusterings)
         loss = dataset.loss_fn(input=preds[dataset.train_mask], target=dataset.targets[dataset.train_mask])
 
     gradscaler.scale(loss).backward()
@@ -47,7 +47,7 @@ def evaluate_full_graph_transductive(model, dataset, amp=False):
     model.eval()
 
     with torch.autocast(enabled=amp, device_type=dataset.graph.device.type):
-        preds = model(graph=dataset.graph, x=dataset.features)
+        preds = model(graph=dataset.graph, x=dataset.features, clusterings=dataset.clusterings)
 
     metrics = dataset.compute_metrics_transductive(preds)
 

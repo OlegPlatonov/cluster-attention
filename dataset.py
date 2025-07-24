@@ -17,6 +17,8 @@ from sklearn.model_selection import train_test_split
 from torch_geometric import datasets as pyg_datasets
 from ogb.nodeproppred import NodePropPredDataset
 
+from clustering import Clustering
+
 
 class Dataset:
     # Datasets by source.
@@ -65,7 +67,8 @@ class Dataset:
     def __init__(self, name, split=None, transductive=True, add_self_loops=False, node_embeddings=None,
                  regression_targets_transform='none', numerical_features_transform='none',
                  fraction_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
-                 fraction_features_nan_imputation_strategy='most_frequent', device='cpu'):
+                 fraction_features_nan_imputation_strategy='most_frequent', clusterings=None, min_cluster_size=0,
+                 max_cluster_size=np.inf, device='cpu'):
         print('Preparing data...')
         if name in self.graphland_datasets_names:
             if transductive:
@@ -206,6 +209,15 @@ class Dataset:
                               fraction_features_transform_name=fraction_features_transform,
                               numerical_features_nan_imputation_strategy=numerical_features_nan_imputation_strategy,
                               fraction_features_nan_imputation_strategy=fraction_features_nan_imputation_strategy)
+
+        if clusterings is not None:
+            self.clusterings = [
+                Clustering(dataset_name=name, clustering_name=clustering, min_size=min_cluster_size,
+                           max_size=max_cluster_size, device=device)
+                for clustering in clusterings
+            ]
+        else:
+            self.clusterings = None
 
     def apply_transforms(self, regression_targets_transform_name, numerical_features_transform_name,
                          fraction_features_transform_name, numerical_features_nan_imputation_strategy,
