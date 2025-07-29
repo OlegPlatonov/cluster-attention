@@ -95,7 +95,7 @@ def get_args():
                             'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions',
                             # Classic datasets
                             'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
-                            'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
+                            'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook', 'wiki-cs', 'flickr',
                             # OGB datasets
                             'ogbn-arxiv', 'ogbn-products'
                         ])
