@@ -30,15 +30,16 @@ class Dataset:
     ]
     pyg_datasets_names = [
         'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'cora', 'citeseer', 'pubmed',
-        'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook'
+        'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook', 'wiki-cs',
+        'flickr'
     ]
     ogb_datasets_names = ['ogbn-arxiv', 'ogbn-products']
 
     # Datasets by task.
     multiclass_classification_datasets_names = [
         'hm-categories', 'pokec-regions', 'web-topics', 'roman-empire', 'amazon-ratings', 'cora', 'citeseer', 'pubmed',
-        'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook',
-        'ogbn-arxiv', 'ogbn-products'
+        'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook', 'wiki-cs',
+        'flickr', 'ogbn-arxiv', 'ogbn-products'
     ]
     binary_classification_datasets_names = [
         'tolokers-2', 'artnet-exp', 'city-reviews', 'web-fraud', 'minesweeper', 'tolokers', 'questions',
@@ -49,8 +50,9 @@ class Dataset:
 
     # Not all datasets obtained from PyG have predefined data splits. Random class stratified splits will be used for
     # other datasets.
-    pyg_datasets_with_predefined_splits_names = ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers',
-                                                 'questions']
+    pyg_datasets_with_predefined_splits_names = [
+        'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'flickr'
+    ]
 
     transforms = {
         'none': partial(FunctionTransformer, func=lambda x: x, inverse_func=lambda x: x),
@@ -619,6 +621,10 @@ class Dataset:
             dataset = pyg_datasets.LastFMAsia(root=os.path.join('data', name))
         elif name == 'facebook':
             dataset = pyg_datasets.FacebookPagePage(root=os.path.join('data', name))
+        elif name == 'wiki-cs':
+            dataset = pyg_datasets.WikiCS(root=os.path.join('data', name), is_undirected=True)
+        elif name == 'flickr':
+            dataset = pyg_datasets.Flickr(root=os.path.join('data', name))
         else:
             raise ValueError(f'Unknown PyG dataset name: {name}.')
 
@@ -631,15 +637,23 @@ class Dataset:
 
         # Get data splits.
         if name in Dataset.pyg_datasets_with_predefined_splits_names:
-            # These datasets have 10 predefined data splits, but we will only use the first one.
-            train_mask = pyg_data.train_mask[:, 0]
-            val_mask = pyg_data.val_mask[:, 0]
-            test_mask = pyg_data.test_mask[:, 0]
+            if pyg_data.train_mask.dim() == 1:
+                # These datasets have a single predefined data split.
+                train_mask = pyg_data.train_mask
+                val_mask = pyg_data.val_mask
+                test_mask = pyg_data.test_mask
+
+            else:
+                # These datasets have several predefined data splits, but we will only use the first one.
+                train_mask = pyg_data.train_mask[:, 0]
+                val_mask = pyg_data.val_mask[:, 0]
+                test_mask = pyg_data.test_mask[:, 0]
+
         else:
             # A random stratified by class data split will be created.
-            train_idx, val_and_test_idx = train_test_split(torch.arange(num_nodes), test_size=0.75, random_state=0,
+            train_idx, val_and_test_idx = train_test_split(torch.arange(num_nodes), test_size=0.5, random_state=0,
                                                            stratify=targets)
-            val_idx, test_idx = train_test_split(val_and_test_idx, test_size=0.66, random_state=0,
+            val_idx, test_idx = train_test_split(val_and_test_idx, test_size=0.5, random_state=0,
                                                  stratify=targets[val_and_test_idx])
 
             train_mask = torch.zeros_like(targets, dtype=torch.bool)
