@@ -625,9 +625,9 @@ class Dataset:
             test_mask = pyg_data.test_mask[:, 0]
         else:
             # A random stratified by class data split will be created.
-            train_idx, val_and_test_idx = train_test_split(torch.arange(num_nodes), test_size=0.75, random_state=0,
+            train_idx, val_and_test_idx = train_test_split(torch.arange(num_nodes), test_size=0.5, random_state=0,
                                                            stratify=targets)
-            val_idx, test_idx = train_test_split(val_and_test_idx, test_size=0.66, random_state=0,
+            val_idx, test_idx = train_test_split(val_and_test_idx, test_size=0.5, random_state=0,
                                                  stratify=targets[val_and_test_idx])
 
             train_mask = torch.zeros_like(targets, dtype=torch.bool)
