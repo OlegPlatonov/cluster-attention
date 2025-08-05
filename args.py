@@ -52,6 +52,7 @@ class ExperimentConfig:
     min_cluster_size: int = 4
     max_cluster_size: int = 512
     attn_dim: int = 512
+    use_clustering_features: bool = False
 
     # Training hyperparameters.
     lr: float = 3e-4
@@ -165,6 +166,8 @@ def get_args():
     parser.add_argument('--min_cluster_size', nargs='+', type=int, default=None)
     parser.add_argument('--max_cluster_size', nargs='+', type=int, default=None)
     parser.add_argument('--attn_dim', nargs='+', type=int, default=None)
+    parser.add_argument('--use_clustering_features', nargs='+', type=str_to_bool, default=None,
+                        help='Add one-hot encoded cluster ids for each clustering to node features.')
 
     # Training hyperparameters.
     parser.add_argument('--lr', nargs='+', type=float, default=None)

@@ -70,7 +70,7 @@ class Dataset:
                  regression_targets_transform='none', numerical_features_transform='none',
                  fraction_features_transform='none', numerical_features_nan_imputation_strategy='most_frequent',
                  fraction_features_nan_imputation_strategy='most_frequent', clusterings=None, min_cluster_size=0,
-                 max_cluster_size=np.inf, device='cpu'):
+                 max_cluster_size=np.inf, use_clustering_features=False, device='cpu'):
         print('Preparing data...')
         if name in self.graphland_datasets_names:
             if transductive:
@@ -212,14 +212,30 @@ class Dataset:
                               numerical_features_nan_imputation_strategy=numerical_features_nan_imputation_strategy,
                               fraction_features_nan_imputation_strategy=fraction_features_nan_imputation_strategy)
 
-        if clusterings is not None:
+        if clusterings is None:
+            self.clusterings = None
+        else:
             self.clusterings = [
                 Clustering(dataset_name=name, clustering_name=clustering, min_size=min_cluster_size,
                            max_size=max_cluster_size, device=device)
                 for clustering in clusterings
             ]
-        else:
-            self.clusterings = None
+
+            if use_clustering_features:
+                clustering_features = [clustering.get_clustering_features() for clustering in self.clusterings]
+                clustering_features = torch.cat(clustering_features, axis=1).to(device)
+                clustering_features_dim = clustering_features.shape[1]
+
+                self.features = torch.cat([self.features, clustering_features], axis=1)
+                self.features_dim += clustering_features_dim
+
+                if self.numerical_features_mask is not None:
+                    padding = torch.zeros(clustering_features_dim, dtype=torch.bool, device=device)
+                    self.numerical_features_mask = torch.cat([self.numerical_features_mask, padding], axis=0)
+
+                if self.fraction_features_mask is not None:
+                    padding = torch.zeros(clustering_features_dim, dtype=torch.bool, device=device)
+                    self.fraction_features_mask = torch.cat([self.fraction_features_mask, padding], axis=0)
 
     def apply_transforms(self, regression_targets_transform_name, numerical_features_transform_name,
                          fraction_features_transform_name, numerical_features_nan_imputation_strategy,
