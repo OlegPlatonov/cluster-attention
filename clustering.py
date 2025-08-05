@@ -24,7 +24,7 @@ class Clustering:
 
         self.forward_reshape_idx = torch.tensor(clusters, dtype=torch.int64, device=device)
 
-        self.backward_reshape_idx_padded = (
+        self.backward_reshape_double_idx = (
             torch.full(size=(num_nodes,), fill_value=-1, dtype=torch.int64, device=device),
             torch.full(size=(num_nodes,), fill_value=-1, dtype=torch.int64, device=device),
         )
@@ -34,5 +34,5 @@ class Clustering:
                 if node_id == -1:
                     break
 
-                self.backward_reshape_idx_padded[0][node_id] = i
-                self.backward_reshape_idx_padded[1][node_id] = j
+                self.backward_reshape_double_idx[0][node_id] = i
+                self.backward_reshape_double_idx[1][node_id] = j

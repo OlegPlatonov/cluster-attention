@@ -309,7 +309,7 @@ class ClusterAttentionModule(nn.Module):
         x = x.transpose(1, 2)
 
         # Shape: [num_nodes, num_heads, head_dim]
-        x = x[*clustering.backward_reshape_idx_padded]
+        x = x[clustering.backward_reshape_double_idx[0], clustering.backward_reshape_double_idx[1]]
 
         # Shape: [num_nodes, attn_dim]
         x = x.flatten(start_dim=1, end_dim=2)
