@@ -36,26 +36,3 @@ class Clustering:
 
                 self.backward_reshape_idx_padded[0][node_id] = i
                 self.backward_reshape_idx_padded[1][node_id] = j
-
-        self.backward_reshape_idx_contiguous = torch.full(size=(num_nodes,), fill_value=-1, dtype=torch.int64,
-                                                          device=device)
-
-        i = 0
-        for cluster in clusters:
-            for node_id in cluster:
-                if node_id == -1:
-                    break
-
-                self.backward_reshape_idx_contiguous[node_id] = i
-                i += 1
-
-        self.backward_reshape_idx_noncontiguous = torch.full(size=(num_nodes,), fill_value=-1, dtype=torch.int64,
-                                                             device=device)
-
-        i = 0
-        for cluster in clusters:
-            for node_id in cluster:
-                if node_id != -1:
-                    self.backward_reshape_idx_noncontiguous[node_id] = i
-
-                i += 1
