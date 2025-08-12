@@ -468,10 +468,10 @@ class Dataset:
         edges_df = pd.read_csv(f'data/{name}/edgelist.csv')
         edges = edges_df.values[:, :2]
 
-        split_masks = np.load(f'data/{name}/split_masks_{split}.npz')
-        train_mask_orig = split_masks['train']
-        val_mask_orig = split_masks['val']
-        test_mask_orig = split_masks['test']
+        split_masks_df = pd.read_csv(f'data/{name}/split_masks_{split}.csv', index_col=0)
+        train_mask_orig = split_masks_df['train'].values
+        val_mask_orig = split_masks_df['val'].values
+        test_mask_orig = split_masks_df['test'].values
 
         labeled_mask = ~np.isnan(targets)
         train_mask = (train_mask_orig & labeled_mask)
@@ -501,10 +501,10 @@ class Dataset:
         with open(f'data/{name}/info.yaml', 'r') as file:
             info = yaml.safe_load(file)
 
-        split_masks = np.load(f'data/{name}/split_masks_{split}.npz')
-        train_mask_orig = split_masks['train']
-        val_mask_orig = split_masks['val']
-        test_mask_orig = split_masks['test']
+        split_masks_df = pd.read_csv(f'data/{name}/split_masks_{split}.csv', index_col=0)
+        train_mask_orig = split_masks_df['train'].values
+        val_mask_orig = split_masks_df['val'].values
+        test_mask_orig = split_masks_df['test'].values
 
         fraction_features_names_set = set(info['fraction_features_names'])
         numerical_features_names = [
