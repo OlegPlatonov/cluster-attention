@@ -101,8 +101,11 @@ def get_args():
                         ])
     parser.add_argument('--split', type=str, default=None)
     parser.add_argument('--transductive', type=str_to_bool, default=None)
-    parser.add_argument('--train_regime', type=str, default=None, choices=['full-graph', 'minibatch'])
-    parser.add_argument('--config', type=str, default=None, help='Name of a config yaml file in the configs directory.')
+    parser.add_argument('--train_regime', type=str, default=None, choices=['full-graph', 'minibatch'],
+                        help='WIP. Minibatch training regime has not been implemented yet.')
+    parser.add_argument('--config', type=str, default=None,
+                        help='Name of a config yaml file in the configs directory. '
+                             'WIP. Reading arguments from configs has not been tested yet.')
 
     # Data preprocessing.
     parser.add_argument('--regression_targets_transform', nargs='+', type=str, default=None,
@@ -217,6 +220,7 @@ def get_args():
         args.hparam_search_strategy = 'grid-search'
         args.num_hparam_search_trials = num_grid_search_trials
     elif optuna:
+        # WIP. Optuna hyperparameter search has not been tested yet.
         args.hparam_search_strategy = 'optuna'
         args.num_hparam_search_trials = args.num_optuna_trials
     else:
