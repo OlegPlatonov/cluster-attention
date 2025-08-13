@@ -50,6 +50,7 @@ class GridSearchHparamGenerator(BaseHparamGenerator):
 
 
 class OptunaHparamGenerator(BaseHparamGenerator):
+    """WIP. Optuna hyperparameter generator has not been tested yet."""
     lr_map = [1e-5, 2e-5, 3e-5, 5e-5, 7e-5, 1e-4, 2e-4, 3e-4, 5e-4, 7e-4, 1e-3, 2e-3, 3e-3, 5e-3, 7e-3, 1e-2]
 
     def __init__(self, args):

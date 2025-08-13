@@ -158,8 +158,7 @@ def train_full_graph_inductive(model, dataset, args, run_id):
 
 
 def train_minibatch(model, dataset, args, run_id):
-    optimizer, gradscaler, scheduler = prepare_for_training(model=model, args=args)
-    return results
+    raise NotImplementedError
 
 
 def get_train_fn(train_regime, transductive):
