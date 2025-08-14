@@ -7,7 +7,7 @@ from plr_embeddings import PLREmbeddings
 
 class Model(nn.Module):
     modules = {
-        'ResNet': [FeedForwardModule],
+        'ResMLP': [FeedForwardModule],
         'GCN': [GCNModule],
         'GraphSAGE': [GraphSAGEModule],
         'GAT': [GATModule],
