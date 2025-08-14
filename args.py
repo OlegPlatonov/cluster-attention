@@ -156,7 +156,7 @@ def get_args():
 
     # Model architecture.
     parser.add_argument('--model', nargs='+', type=str, default=None,
-                        choices=['ResNet', 'GCN', 'GraphSAGE', 'GAT', 'GAT-sep', 'GT', 'GT-sep', 'McGT'])
+                        choices=['ResMLP', 'GCN', 'GraphSAGE', 'GAT', 'GAT-sep', 'GT', 'GT-sep', 'McGT'])
     parser.add_argument('--num_layers', nargs='+', type=int, default=None)
     parser.add_argument('--hidden_dim', nargs='+', type=int, default=None)
     parser.add_argument('--num_heads', nargs='+', type=int, default=None)
