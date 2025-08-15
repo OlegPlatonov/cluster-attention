@@ -47,6 +47,12 @@ class Dataset:
         'hm-prices', 'avazu-ctr', 'artnet-views', 'twitch-views', 'city-roads-M', 'city-roads-L', 'web-traffic'
     ]
 
+    # Not all datasets obtained from PyG have predefined data splits. Random class stratified splits will be used for
+    # other datasets.
+    pyg_datasets_with_predefined_splits_names = [
+        'roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions', 'flickr'
+    ]
+
     transforms = {
         'none': partial(FunctionTransformer, func=lambda x: x, inverse_func=lambda x: x),
         'standard-scaler': partial(StandardScaler, copy=False),
@@ -644,10 +650,26 @@ class Dataset:
         edges = pyg_data.edge_index.T
         graph = Dataset.get_graph(edges=edges, num_nodes=num_nodes, add_self_loops=add_self_loops)
 
-        split_masks_df = pd.read_csv(f'data/splits/{name.replace("-", "_")}_split_masks.csv', index_col=0)
-        train_mask = torch.tensor(split_masks_df['train'].values)
-        val_mask = torch.tensor(split_masks_df['val'].values)
-        test_mask = torch.tensor(split_masks_df['test'].values)
+        # Get data splits.
+        if name in Dataset.pyg_datasets_with_predefined_splits_names:
+            if pyg_data.train_mask.dim() == 1:
+                # These datasets have a single predefined data split.
+                train_mask = pyg_data.train_mask
+                val_mask = pyg_data.val_mask
+                test_mask = pyg_data.test_mask
+
+            else:
+                # These datasets have several predefined data splits, but we will only use the first one.
+                train_mask = pyg_data.train_mask[:, 0]
+                val_mask = pyg_data.val_mask[:, 0]
+                test_mask = pyg_data.test_mask[:, 0]
+
+        else:
+            # A random stratified 10/10/80 train/val/test split will be used.
+            split_masks_df = pd.read_csv(f'data/splits/{name.replace("-", "_")}_split_masks.csv', index_col=0)
+            train_mask = torch.tensor(split_masks_df['train'].values)
+            val_mask = torch.tensor(split_masks_df['val'].values)
+            test_mask = torch.tensor(split_masks_df['test'].values)
 
         return graph, features, targets, train_mask, val_mask, test_mask
 
@@ -660,10 +682,19 @@ class Dataset:
         edges = data['edge_index'].T
         graph = Dataset.get_graph(edges=edges, num_nodes=len(features), add_self_loops=add_self_loops)
 
-        split_masks_df = pd.read_csv(f'data/splits/{name.replace("-", "_")}_split_masks.csv', index_col=0)
-        train_mask = torch.tensor(split_masks_df['train'].values)
-        val_mask = torch.tensor(split_masks_df['val'].values)
-        test_mask = torch.tensor(split_masks_df['test'].values)
+        split = dataset.get_idx_split()
+        train_idx = split['train']
+        val_idx = split['valid']
+        test_idx = split['test']
+
+        train_mask = torch.zeros_like(targets, dtype=torch.bool)
+        train_mask[train_idx] = True
+
+        val_mask = torch.zeros_like(targets, dtype=torch.bool)
+        val_mask[val_idx] = True
+
+        test_mask = torch.zeros_like(targets, dtype=torch.bool)
+        test_mask[test_idx] = True
 
         return graph, features, targets, train_mask, val_mask, test_mask
 
