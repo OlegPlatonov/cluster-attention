@@ -69,8 +69,8 @@ class GraphSAGEModule(nn.Module):
                                                      dropout=dropout)
 
     def forward(self, graph, x, **kwargs):
-        message = ops.copy_u_mean(graph, x)
-        x = torch.cat([x, message], axis=1)
+        x_aggr = ops.copy_u_mean(graph, x)
+        x = torch.cat([x, x_aggr], axis=1)
 
         x = self.feed_forward_module(graph, x)
 
@@ -149,10 +149,10 @@ class GATSepModule(nn.Module):
         attn_probs = ops.edge_softmax(graph, attn_scores)
 
         x = x.reshape(-1, self.head_dim, self.num_heads)
-        message = ops.u_mul_e_sum(graph, x, attn_probs)
+        x_aggr = ops.u_mul_e_sum(graph, x, attn_probs)
         x = x.reshape(-1, self.dim)
-        message = message.reshape(-1, self.dim)
-        x = torch.cat([x, message], axis=1)
+        x_aggr = x_aggr.reshape(-1, self.dim)
+        x = torch.cat([x, x_aggr], axis=1)
 
         x = self.feed_forward_module(graph, x)
 
@@ -214,9 +214,9 @@ class TransformerAttentionSepModule(nn.Module):
         attn_scores = ops.u_dot_v(graph, keys, queries) * self.attn_scores_multiplier
         attn_probs = ops.edge_softmax(graph, attn_scores)
 
-        message = ops.u_mul_e_sum(graph, values, attn_probs)
-        message = message.reshape(-1, self.dim)
-        x = torch.cat([x, message], axis=1)
+        x_aggr = ops.u_mul_e_sum(graph, values, attn_probs)
+        x_aggr = x_aggr.reshape(-1, self.dim)
+        x = torch.cat([x, x_aggr], axis=1)
 
         x = self.output_linear(x)
         x = self.dropout(x)
