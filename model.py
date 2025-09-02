@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from modules import (ResidualModuleWrapper, FeedForwardModule, GCNModule, GraphSAGEModule, GATModule, GATSepModule,
-                     TransformerAttentionModule, TransformerAttentionSepModule, ClusterAttentionModule)
+                     TransformerAttentionModule, TransformerAttentionSepModule, GCNCLATTModule, GraphSAGECLATTModule,
+                     GATCLATTModule, TransformerAttentionCLATTModule)
 from plr_embeddings import PLREmbeddings
 
 
@@ -9,12 +10,15 @@ class Model(nn.Module):
     modules = {
         'ResMLP': [FeedForwardModule],
         'GCN': [GCNModule],
+        'GCN-CLATT': [GCNCLATTModule],
         'GraphSAGE': [GraphSAGEModule],
+        'GraphSAGE-CLATT': [GraphSAGECLATTModule],
         'GAT': [GATModule],
+        'GAT-CLATT': [GATCLATTModule],
         'GAT-sep': [GATSepModule],
         'GT': [TransformerAttentionModule, FeedForwardModule],
+        'GT-CLATT': [TransformerAttentionCLATTModule, FeedForwardModule],
         'GT-sep': [TransformerAttentionSepModule, FeedForwardModule],
-        'McGT': [ClusterAttentionModule, FeedForwardModule]
     }
 
     normalization = {
@@ -23,8 +27,8 @@ class Model(nn.Module):
         'batchnorm': nn.BatchNorm1d
     }
 
-    def __init__(self, model_name, num_layers, features_dim, hidden_dim, output_dim, num_clusterings, attn_dim,
-                 num_heads, hidden_dim_multiplier, normalization, dropout, use_plr, numerical_features_mask,
+    def __init__(self, model_name, num_layers, features_dim, hidden_dim, output_dim, num_clusterings, num_heads,
+                 hidden_dim_multiplier, normalization, dropout, use_plr, numerical_features_mask,
                  plr_frequencies_dim, plr_frequencies_scale, plr_embedding_dim, use_plr_lite):
         super().__init__()
 
@@ -62,7 +66,6 @@ class Model(nn.Module):
                                                         dim=hidden_dim,
                                                         hidden_dim_multiplier=hidden_dim_multiplier,
                                                         num_clusterings=num_clusterings,
-                                                        attn_dim=attn_dim,
                                                         num_heads=num_heads,
                                                         dropout=dropout)
 
@@ -98,7 +101,6 @@ def get_model(args, dataset):
                   hidden_dim=args.hidden_dim,
                   output_dim=dataset.targets_dim,
                   num_clusterings=len(args.clusterings) if args.clusterings is not None else 0,
-                  attn_dim=args.attn_dim,
                   num_heads=args.num_heads,
                   hidden_dim_multiplier=args.hidden_dim_multiplier,
                   normalization=args.normalization,

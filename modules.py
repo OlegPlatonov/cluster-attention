@@ -225,24 +225,190 @@ class TransformerAttentionSepModule(nn.Module):
 
 
 class ClusterAttentionModule(nn.Module):
-    def __init__(self, dim, num_clusterings, attn_dim, num_heads, dropout=0, **kwargs):
+    def __init__(self, dim, num_clusterings, num_heads):
         super().__init__()
 
-        _check_dim_and_num_heads_consistency(attn_dim, num_heads)
+        _check_dim_and_num_heads_consistency(dim, num_heads)
         self.dim = dim
         self.num_clusterings = num_clusterings
-        self.attn_dim = attn_dim
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
         self.attn_scores_multiplier = 1 / torch.tensor(self.head_dim).sqrt()
 
-        self.attn_qkv_linear = nn.Linear(in_features=dim, out_features=attn_dim * (num_clusterings + 1) * 3)
+        self.attn_qkv_linear = nn.Linear(in_features=dim, out_features=dim * num_clusterings * 3)
 
-        self.output_linear = nn.Linear(in_features=attn_dim * (num_clusterings + 1), out_features=dim)
+    def forward(self, x, clusterings):
+        # Shape: [num_nodes, dim * num_clusterings * 3]
+        qkvs_all = self.attn_qkv_linear(x)
+        # Shape: [num_nodes, num_clusterings, 3, num_heads, head_dim]
+        qkvs_all = qkvs_all.unflatten(dim=-1, sizes=(self.num_clusterings, 3, self.num_heads, self.head_dim))
+
+        x = []
+        for i in range(self.num_clusterings):
+            # Shape: [num_nodes, 3, num_heads, head_dim]
+            qkvs_cur = qkvs_all[:, i]
+            x_cur = self.cluster_attention(clustering=clusterings[i], qkvs=qkvs_cur)
+            x.append(x_cur)
+
+        x = torch.cat(x, axis=1)
+
+        return x
+
+    def cluster_attention(self, clustering, qkvs):
+        padding = torch.zeros(1, 3, self.num_heads, self.head_dim, dtype=qkvs.dtype, device=qkvs.device,
+                              requires_grad=True)
+        # Shape: [num_nodes + 1, 3, num_heads, head_dim]
+        qkvs = torch.cat([qkvs, padding], axis=0)
+
+        # Shape: [num_clusters, max_cluster_size, 3, num_heads, head_dim]
+        qkvs = qkvs[clustering.forward_reshape_idx]
+
+        # Shape: [num_clusters, num_heads, 3, max_cluster_size, head_dim]
+        qkvs = qkvs.transpose(1, 3)
+
+        # Shape: [num_clusters, num_heads, max_cluster_size, head_dim]
+        queries, keys, values = qkvs[:, :, 0], qkvs[:, :, 1], qkvs[:, :, 2]
+
+        # Shape: [num_clusters, num_heads, max_cluster_size, head_dim]
+        x = F.scaled_dot_product_attention(query=queries, key=keys, value=values, attn_mask=clustering.attn_mask)
+
+        # Shape: [num_clusters, max_cluster_size, num_heads, head_dim]
+        x = x.transpose(1, 2)
+
+        # Shape: [num_nodes, num_heads, head_dim]
+        x = x[clustering.backward_reshape_double_idx[0], clustering.backward_reshape_double_idx[1]]
+
+        # Shape: [num_nodes, dim]
+        x = x.flatten(start_dim=1, end_dim=2)
+
+        return x
+
+
+class GCNCLATTModule(nn.Module):
+    def __init__(self, dim, num_clusterings, num_heads, hidden_dim_multiplier=1, dropout=0, **kwargs):
+        super().__init__()
+
+        self.num_clusterings = num_clusterings
+
+        self.cluster_attention_module = ClusterAttentionModule(dim=dim,
+                                                               num_clusterings=num_clusterings,
+                                                               num_heads=num_heads)
+
+        self.feed_forward_module = FeedForwardModule(dim=dim,
+                                                     num_inputs=1 + num_clusterings,
+                                                     hidden_dim_multiplier=hidden_dim_multiplier,
+                                                     dropout=dropout)
+
+    def forward(self, graph, x, clusterings, **kwargs):
+        x_clatt = self.cluster_attention_module(x, clusterings)
+
+        in_degrees = graph.in_degrees().float()
+        out_degrees = graph.out_degrees().float()
+        degree_edge_products = ops.u_mul_v(graph, out_degrees, in_degrees)
+        degree_edge_products[degree_edge_products == 0] = 1
+        norm_coefs = 1 / degree_edge_products.sqrt()
+
+        x = ops.u_mul_e_sum(graph, x, norm_coefs)
+
+        x = torch.cat([x, x_clatt], axis=1)
+
+        x = self.feed_forward_module(graph, x)
+
+        return x
+
+
+class GraphSAGECLATTModule(nn.Module):
+    def __init__(self, dim, num_clusterings, num_heads, hidden_dim_multiplier=1, dropout=0, **kwargs):
+        super().__init__()
+
+        self.num_clusterings = num_clusterings
+
+        self.cluster_attention_module = ClusterAttentionModule(dim=dim,
+                                                               num_clusterings=num_clusterings,
+                                                               num_heads=num_heads)
+
+        self.feed_forward_module = FeedForwardModule(dim=dim,
+                                                     num_inputs=2 + num_clusterings,
+                                                     hidden_dim_multiplier=hidden_dim_multiplier,
+                                                     dropout=dropout)
+
+    def forward(self, graph, x, clusterings, **kwargs):
+        x_clatt = self.cluster_attention_module(x, clusterings)
+
+        x_aggr = ops.copy_u_mean(graph, x)
+
+        x = torch.cat([x, x_aggr, x_clatt], axis=1)
+
+        x = self.feed_forward_module(graph, x)
+
+        return x
+
+
+class GATCLATTModule(nn.Module):
+    def __init__(self, dim, num_clusterings, num_heads, hidden_dim_multiplier=1, dropout=0, **kwargs):
+        super().__init__()
+
+        _check_dim_and_num_heads_consistency(dim, num_heads)
+        self.dim = dim
+        self.num_clusterings = num_clusterings
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+
+        self.input_linear = nn.Linear(in_features=dim, out_features=dim)
+
+        self.attn_linear_u = nn.Linear(in_features=dim, out_features=num_heads)
+        self.attn_linear_v = nn.Linear(in_features=dim, out_features=num_heads, bias=False)
+        self.attn_act = nn.LeakyReLU(negative_slope=0.2)
+
+        self.cluster_attention_module = ClusterAttentionModule(dim=dim,
+                                                               num_clusterings=num_clusterings,
+                                                               num_heads=num_heads)
+
+        self.feed_forward_module = FeedForwardModule(dim=dim,
+                                                     num_inputs=1 + num_clusterings,
+                                                     hidden_dim_multiplier=hidden_dim_multiplier,
+                                                     dropout=dropout)
+
+    def forward(self, graph, x, clusterings, **kwargs):
+        x_clatt = self.cluster_attention_module(x, clusterings)
+
+        x = self.input_linear(x)
+
+        attn_scores_u = self.attn_linear_u(x)
+        attn_scores_v = self.attn_linear_v(x)
+        attn_scores = ops.u_add_v(graph, attn_scores_u, attn_scores_v)
+        attn_scores = self.attn_act(attn_scores)
+        attn_probs = ops.edge_softmax(graph, attn_scores)
+
+        x = x.reshape(-1, self.head_dim, self.num_heads)
+        x = ops.u_mul_e_sum(graph, x, attn_probs)
+        x = x.reshape(-1, self.dim)
+
+        x = torch.cat([x, x_clatt], axis=1)
+
+        x = self.feed_forward_module(graph, x)
+
+        return x
+
+
+class TransformerAttentionCLATTModule(nn.Module):
+    def __init__(self, dim, num_clusterings, num_heads, dropout=0, **kwargs):
+        super().__init__()
+
+        _check_dim_and_num_heads_consistency(dim, num_heads)
+        self.dim = dim
+        self.num_clusterings = num_clusterings
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.attn_scores_multiplier = 1 / torch.tensor(self.head_dim).sqrt()
+
+        self.attn_qkv_linear = nn.Linear(in_features=dim, out_features=dim * (num_clusterings + 1) * 3)
+
+        self.output_linear = nn.Linear(in_features=dim * (num_clusterings + 1), out_features=dim)
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, graph, x, clusterings, **kwargs):
-        # Shape: [num_nodes, attn_dim * (num_clusterings + 1) * 3]
+        # Shape: [num_nodes, dim * (num_clusterings + 1) * 3]
         qkvs_all = self.attn_qkv_linear(x)
         # Shape: [num_nodes, num_clusterings + 1, 3, num_heads, head_dim]
         qkvs_all = qkvs_all.unflatten(dim=-1, sizes=(self.num_clusterings + 1, 3, self.num_heads, self.head_dim))
@@ -275,7 +441,7 @@ class ClusterAttentionModule(nn.Module):
 
         # Shape: [num_nodes, num_heads, head_dim]
         x = ops.u_mul_e_sum(graph, values, attn_probs)
-        # Shape: [num_nodes, attn_dim]
+        # Shape: [num_nodes, dim]
         x = x.flatten(start_dim=1, end_dim=2)
 
         return x
@@ -304,7 +470,7 @@ class ClusterAttentionModule(nn.Module):
         # Shape: [num_nodes, num_heads, head_dim]
         x = x[clustering.backward_reshape_double_idx[0], clustering.backward_reshape_double_idx[1]]
 
-        # Shape: [num_nodes, attn_dim]
+        # Shape: [num_nodes, dim]
         x = x.flatten(start_dim=1, end_dim=2)
 
         return x

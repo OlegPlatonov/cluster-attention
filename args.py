@@ -47,11 +47,10 @@ class ExperimentConfig:
     hidden_dim_multiplier: float = 1
     normalization: str = 'layernorm'
 
-    # Only used for McGT.
+    # Clusterings.
     clusterings: list[str] = None
     min_cluster_size: int = 4
     max_cluster_size: int = 512
-    attn_dim: int = 512
     use_clustering_features: bool = False
 
     # Training hyperparameters.
@@ -155,7 +154,13 @@ def get_args():
 
     # Model architecture.
     parser.add_argument('--model', nargs='+', type=str, default=None,
-                        choices=['ResMLP', 'GCN', 'GraphSAGE', 'GAT', 'GAT-sep', 'GT', 'GT-sep', 'McGT'])
+                        choices=[
+                            'ResMLP',
+                            'GCN', 'GCN-CLATT',
+                            'GraphSAGE', 'GraphSAGE-CLATT',
+                            'GAT', 'GAT-CLATT', 'GAT-sep',
+                            'GT', 'GT-CLATT', 'GT-sep'
+                        ])
     parser.add_argument('--num_layers', nargs='+', type=int, default=None)
     parser.add_argument('--hidden_dim', nargs='+', type=int, default=None)
     parser.add_argument('--num_heads', nargs='+', type=int, default=None)
@@ -163,11 +168,10 @@ def get_args():
     parser.add_argument('--normalization', nargs='+', type=str, default=None,
                         choices=['none', 'layernorm', 'batchnorm'])
 
-    # Only used for McGT.
+    # Clusterings.
     parser.add_argument('--clusterings', nargs='+', type=str, default=None)
     parser.add_argument('--min_cluster_size', nargs='+', type=int, default=None)
     parser.add_argument('--max_cluster_size', nargs='+', type=int, default=None)
-    parser.add_argument('--attn_dim', nargs='+', type=int, default=None)
     parser.add_argument('--use_clustering_features', nargs='+', type=str_to_bool, default=None,
                         help='Add one-hot encoded cluster ids for each clustering to node features.')
 
