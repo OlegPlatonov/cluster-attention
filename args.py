@@ -159,7 +159,8 @@ def get_args():
                             'GCN', 'GCN-CLATT',
                             'GraphSAGE', 'GraphSAGE-CLATT',
                             'GAT', 'GAT-CLATT', 'GAT-sep',
-                            'GT', 'GT-CLATT', 'GT-sep'
+                            'GT', 'GT-CLATT', 'GT-sep',
+                            'GGT', 'GGT-CLATT'
                         ])
     parser.add_argument('--num_layers', nargs='+', type=int, default=None)
     parser.add_argument('--hidden_dim', nargs='+', type=int, default=None)

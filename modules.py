@@ -224,6 +224,54 @@ class TransformerAttentionSepModule(nn.Module):
         return x
 
 
+class GlobalTransformerAttentionModule(nn.Module):
+    def __init__(self, dim, num_heads, dropout, **kwargs):
+        super().__init__()
+
+        _check_dim_and_num_heads_consistency(dim, num_heads)
+        self.dim = dim
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+
+        self.attn_qkv_linear = nn.Linear(in_features=dim, out_features=dim * 3)
+
+        self.output_linear = nn.Linear(in_features=dim, out_features=dim)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, graph, x, **kwargs):
+        # Shape: [num_nodes, dim * 3]
+        qkvs = self.attn_qkv_linear(x)
+
+        # Shape: [num_nodes, 3, num_heads, head_dim]
+        qkvs = qkvs.unflatten(dim=-1, sizes=(3, self.num_heads, self.head_dim))
+
+        # Shape: [num_heads, 3, num_nodes, head_dim]
+        qkvs = qkvs.transpose(0, 2)
+
+        # Shape: [1, num_heads, 3, num_nodes, head_dim]
+        qkvs = qkvs.unsqueeze(0)
+
+        # Shape: [1, num_heads, num_nodes, head_dim]
+        queries, keys, values = qkvs[:, :, 0], qkvs[:, :, 1], qkvs[:, :, 2]
+
+        # Shape: [1, num_heads, num_nodes, head_dim]
+        x = F.scaled_dot_product_attention(query=queries, key=keys, value=values)
+
+        # Shape: [num_heads, num_nodes, head_dim]
+        x = x.squeeze(0)
+
+        # Shape: [num_nodes, num_heads, head_dim]
+        x = x.transpose(0, 1)
+
+        # Shape: [num_nodes, dim]
+        x = x.flatten(start_dim=1, end_dim=2)
+
+        x = self.output_linear(x)
+        x = self.dropout(x)
+
+        return x
+
+
 class ClusterAttentionModule(nn.Module):
     def __init__(self, dim, num_clusterings, num_heads):
         super().__init__()
@@ -441,6 +489,100 @@ class TransformerAttentionCLATTModule(nn.Module):
 
         # Shape: [num_nodes, num_heads, head_dim]
         x = ops.u_mul_e_sum(graph, values, attn_probs)
+        # Shape: [num_nodes, dim]
+        x = x.flatten(start_dim=1, end_dim=2)
+
+        return x
+
+    def cluster_attention(self, clustering, qkvs):
+        padding = torch.zeros(1, 3, self.num_heads, self.head_dim, dtype=qkvs.dtype, device=qkvs.device,
+                              requires_grad=True)
+        # Shape: [num_nodes + 1, 3, num_heads, head_dim]
+        qkvs = torch.cat([qkvs, padding], axis=0)
+
+        # Shape: [num_clusters, max_cluster_size, 3, num_heads, head_dim]
+        qkvs = qkvs[clustering.forward_reshape_idx]
+
+        # Shape: [num_clusters, num_heads, 3, max_cluster_size, head_dim]
+        qkvs = qkvs.transpose(1, 3)
+
+        # Shape: [num_clusters, num_heads, max_cluster_size, head_dim]
+        queries, keys, values = qkvs[:, :, 0], qkvs[:, :, 1], qkvs[:, :, 2]
+
+        # Shape: [num_clusters, num_heads, max_cluster_size, head_dim]
+        x = F.scaled_dot_product_attention(query=queries, key=keys, value=values, attn_mask=clustering.attn_mask)
+
+        # Shape: [num_clusters, max_cluster_size, num_heads, head_dim]
+        x = x.transpose(1, 2)
+
+        # Shape: [num_nodes, num_heads, head_dim]
+        x = x[clustering.backward_reshape_double_idx[0], clustering.backward_reshape_double_idx[1]]
+
+        # Shape: [num_nodes, dim]
+        x = x.flatten(start_dim=1, end_dim=2)
+
+        return x
+
+
+class GlobalTransformerAttentionCLATTModule(nn.Module):
+    def __init__(self, dim, num_clusterings, num_heads, dropout=0, **kwargs):
+        super().__init__()
+
+        _check_dim_and_num_heads_consistency(dim, num_heads)
+        self.dim = dim
+        self.num_clusterings = num_clusterings
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+
+        self.attn_qkv_linear = nn.Linear(in_features=dim, out_features=dim * (num_clusterings + 1) * 3)
+
+        self.output_linear = nn.Linear(in_features=dim * (num_clusterings + 1), out_features=dim)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, graph, x, clusterings, **kwargs):
+        # Shape: [num_nodes, dim * (num_clusterings + 1) * 3]
+        qkvs_all = self.attn_qkv_linear(x)
+        # Shape: [num_nodes, num_clusterings + 1, 3, num_heads, head_dim]
+        qkvs_all = qkvs_all.unflatten(dim=-1, sizes=(self.num_clusterings + 1, 3, self.num_heads, self.head_dim))
+
+        x = []
+        for i in range(self.num_clusterings + 1):
+            # Shape: [num_nodes, 3, num_heads, head_dim]
+            qkvs_cur = qkvs_all[:, i]
+
+            if i == 0:
+                x_cur = self.global_attention(qkvs=qkvs_cur)
+            else:
+                x_cur = self.cluster_attention(clustering=clusterings[i - 1], qkvs=qkvs_cur)
+
+            x.append(x_cur)
+
+        x = torch.cat(x, axis=1)
+
+        x = self.output_linear(x)
+        x = self.dropout(x)
+
+        return x
+
+    def global_attention(self, qkvs):
+        # Shape: [num_heads, 3, num_nodes, head_dim]
+        qkvs = qkvs.transpose(0, 2)
+
+        # Shape: [1, num_heads, 3, num_nodes, head_dim]
+        qkvs = qkvs.unsqueeze(0)
+
+        # Shape: [1, num_heads, num_nodes, head_dim]
+        queries, keys, values = qkvs[:, :, 0], qkvs[:, :, 1], qkvs[:, :, 2]
+
+        # Shape: [1, num_heads, num_nodes, head_dim]
+        x = F.scaled_dot_product_attention(query=queries, key=keys, value=values)
+
+        # Shape: [num_heads, num_nodes, head_dim]
+        x = x.squeeze(0)
+
+        # Shape: [num_nodes, num_heads, head_dim]
+        x = x.transpose(0, 1)
+
         # Shape: [num_nodes, dim]
         x = x.flatten(start_dim=1, end_dim=2)
 

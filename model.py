@@ -1,8 +1,9 @@
 import torch
 from torch import nn
 from modules import (ResidualModuleWrapper, FeedForwardModule, GCNModule, GraphSAGEModule, GATModule, GATSepModule,
-                     TransformerAttentionModule, TransformerAttentionSepModule, GCNCLATTModule, GraphSAGECLATTModule,
-                     GATCLATTModule, TransformerAttentionCLATTModule)
+                     TransformerAttentionModule, TransformerAttentionSepModule, GlobalTransformerAttentionModule,
+                     GCNCLATTModule, GraphSAGECLATTModule, GATCLATTModule, TransformerAttentionCLATTModule,
+                     GlobalTransformerAttentionCLATTModule)
 from plr_embeddings import PLREmbeddings
 
 
@@ -19,6 +20,8 @@ class Model(nn.Module):
         'GT': [TransformerAttentionModule, FeedForwardModule],
         'GT-CLATT': [TransformerAttentionCLATTModule, FeedForwardModule],
         'GT-sep': [TransformerAttentionSepModule, FeedForwardModule],
+        'GGT': [GlobalTransformerAttentionModule, FeedForwardModule],
+        'GGT-CLATT': [GlobalTransformerAttentionCLATTModule, FeedForwardModule]
     }
 
     normalization = {
