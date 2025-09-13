@@ -88,13 +88,13 @@ class Dataset:
 
         elif name in self.pyg_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_pyg_dataset(
-                name=name, add_self_loops=add_self_loops
+                name=name, add_self_loops=add_self_loops, node_embeddings_name=node_embeddings
             )
             numerical_features_mask, fraction_features_mask = None, None
 
         elif name in self.ogb_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_ogb_dataset(
-                name=name, add_self_loops=add_self_loops
+                name=name, add_self_loops=add_self_loops, node_embeddings_name=node_embeddings
             )
             numerical_features_mask, fraction_features_mask = None, None
 
@@ -473,7 +473,7 @@ class Dataset:
         features = np.concatenate([numerical_features, fraction_features, categorical_features], axis=1)
 
         if node_embeddings_name is not None:
-            node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
+            node_embeddings = np.load(f'embeddings/{name}/{node_embeddings_name}.npy')
             features = np.concatenate([features, node_embeddings], axis=1)
 
         if numerical_features.shape[1] > 0:
@@ -552,7 +552,7 @@ class Dataset:
         features = np.concatenate([numerical_features, fraction_features, categorical_features], axis=1)
 
         if node_embeddings_name is not None:
-            node_embeddings = np.load(f'data/{name}/{node_embeddings_name}.npy')
+            node_embeddings = np.load(f'embeddings/{name}/{node_embeddings_name}.npy')
             features = np.concatenate([features, node_embeddings], axis=1)
 
         if numerical_features.shape[1] > 0:
@@ -623,7 +623,7 @@ class Dataset:
         )
 
     @staticmethod
-    def get_pyg_dataset(name, add_self_loops):
+    def get_pyg_dataset(name, add_self_loops, node_embeddings_name):
         if name in ['roman-empire', 'amazon-ratings', 'minesweeper', 'tolokers', 'questions']:
             dataset = pyg_datasets.HeterophilousGraphDataset(name=name, root='data')
         elif name in ['cora', 'citeseer', 'pubmed']:
@@ -650,6 +650,11 @@ class Dataset:
         edges = pyg_data.edge_index.T
         graph = Dataset.get_graph(edges=edges, num_nodes=num_nodes, add_self_loops=add_self_loops)
 
+        if node_embeddings_name is not None:
+            node_embeddings = np.load(f'embeddings/{name}/{node_embeddings_name}.npy')
+            node_embeddings = torch.tensor(node_embeddings)
+            features = torch.cat([features, node_embeddings], axis=1)
+
         # Get data splits.
         if name in Dataset.pyg_datasets_with_predefined_splits_names:
             if pyg_data.train_mask.dim() == 1:
@@ -674,13 +679,18 @@ class Dataset:
         return graph, features, targets, train_mask, val_mask, test_mask
 
     @staticmethod
-    def get_ogb_dataset(name, add_self_loops):
+    def get_ogb_dataset(name, add_self_loops, node_embeddings_name):
         dataset = NodePropPredDataset(name=name, root='data')
         data, targets = dataset[0]
         targets = torch.tensor(targets.squeeze(1))
         features = torch.tensor(data['node_feat'])
         edges = data['edge_index'].T
         graph = Dataset.get_graph(edges=edges, num_nodes=len(features), add_self_loops=add_self_loops)
+
+        if node_embeddings_name is not None:
+            node_embeddings = np.load(f'embeddings/{name}/{node_embeddings_name}.npy')
+            node_embeddings = torch.tensor(node_embeddings)
+            features = torch.cat([features, node_embeddings], axis=1)
 
         split = dataset.get_idx_split()
         train_idx = split['train']
