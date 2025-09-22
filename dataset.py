@@ -38,7 +38,7 @@ class Dataset:
     multiclass_classification_datasets_names = [
         'hm-categories', 'pokec-regions', 'web-topics', 'roman-empire', 'amazon-ratings', 'cora', 'citeseer', 'pubmed',
         'coauthor-cs', 'coauthor-physics', 'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook', 'wiki-cs',
-        'flickr', 'ogbn-arxiv', 'ogbn-products'
+        'flickr', 'ogbn-arxiv', 'ogbn-products', 'amazon-ratings-full'
     ]
     binary_classification_datasets_names = [
         'tolokers-2', 'artnet-exp', 'city-reviews', 'web-fraud', 'minesweeper', 'tolokers', 'questions',
@@ -95,6 +95,12 @@ class Dataset:
         elif name in self.ogb_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_ogb_dataset(
                 name=name, add_self_loops=add_self_loops, node_embeddings_name=node_embeddings
+            )
+            numerical_features_mask, fraction_features_mask = None, None
+
+        elif name == 'amazon-ratings-full':
+            graph, features, targets, train_mask, val_mask, test_mask = self.get_amazon_ratings_full_dataset(
+                add_self_loops=add_self_loops, node_embeddings_name=node_embeddings
             )
             numerical_features_mask, fraction_features_mask = None, None
 
@@ -705,6 +711,27 @@ class Dataset:
 
         test_mask = torch.zeros_like(targets, dtype=torch.bool)
         test_mask[test_idx] = True
+
+        return graph, features, targets, train_mask, val_mask, test_mask
+
+    @staticmethod
+    def get_amazon_ratings_full_dataset(add_self_loops, node_embeddings_name):
+        features = torch.tensor(np.load('data/amazon-ratings-full/features.npy'))
+        targets = torch.tensor(np.load('data/amazon-ratings-full/labels.npy'))
+
+        if node_embeddings_name is not None:
+            node_embeddings = np.load(f'embeddings/amazon-ratings-full/{node_embeddings_name}.npy')
+            node_embeddings = torch.tensor(node_embeddings)
+            features = torch.cat([features, node_embeddings], axis=1)
+
+        edges = np.load('data/amazon-ratings-full/edgelist.npy')
+        graph = Dataset.get_graph(edges=edges, num_nodes=len(features), add_self_loops=add_self_loops)
+
+        split_masks = np.load('data/amazon-ratings-full/split_RL.npz')
+        labeled_mask = ~torch.isnan(targets)
+        train_mask = (torch.tensor(split_masks['train_mask']) & labeled_mask)
+        val_mask = (torch.tensor(split_masks['val_mask']) & labeled_mask)
+        test_mask = (torch.tensor(split_masks['test_mask']) & labeled_mask)
 
         return graph, features, targets, train_mask, val_mask, test_mask
 

@@ -102,7 +102,9 @@ def get_args():
                             'cora', 'citeseer', 'pubmed', 'coauthor-cs', 'coauthor-physics',
                             'amazon-computers', 'amazon-photo', 'lastfm-asia', 'facebook', 'wiki-cs', 'flickr',
                             # OGB datasets
-                            'ogbn-arxiv', 'ogbn-products'
+                            'ogbn-arxiv', 'ogbn-products',
+                            # New dataset
+                            'amazon-ratings-full'
                         ])
     parser.add_argument('--split', type=str, default=None)
     parser.add_argument('--transductive', type=str_to_bool, default=None)
