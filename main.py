@@ -18,7 +18,7 @@ def main():
     dataset = Dataset(name=args.dataset,
                       split=args.split,
                       transductive=args.transductive,
-                      add_self_loops=(args.model in ['GCN', 'GAT', 'GT']),
+                      add_self_loops=(args.model in ['GCN', 'GCN-CLATT', 'GAT', 'GAT-CLATT', 'GT', 'GT-CLATT']),
                       node_embeddings=args.node_embeddings,
                       clusterings=args.clusterings,
                       min_cluster_size=args.min_cluster_size,
