@@ -104,7 +104,11 @@ def get_args():
                             # OGB datasets
                             'ogbn-arxiv', 'ogbn-products',
                             # New dataset
-                            'amazon-ratings-full'
+                            'amazon-ratings-full',
+                            # BlueSky datasets from GraphBench
+                            'bluesky-quotes-likes', 'bluesky-quotes-replies', 'bluesky-quotes-reposts',
+                            'bluesky-replies-likes', 'bluesky-replies-replies', 'bluesky-replies-reposts',
+                            'bluesky-reposts-likes', 'bluesky-reposts-replies', 'bluesky-reposts-reposts'
                         ])
     parser.add_argument('--split', type=str, default=None)
     parser.add_argument('--transductive', type=str_to_bool, default=None)

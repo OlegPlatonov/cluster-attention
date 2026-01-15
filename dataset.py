@@ -15,6 +15,7 @@ from sklearn.metrics import average_precision_score, r2_score
 
 from torch_geometric import datasets as pyg_datasets
 from ogb.nodeproppred import NodePropPredDataset
+from graphbench import Loader as GraphBenchLoader
 
 from clustering import Clustering
 
@@ -33,6 +34,11 @@ class Dataset:
         'flickr'
     ]
     ogb_datasets_names = ['ogbn-arxiv', 'ogbn-products']
+    bluesky_datasets_names = [
+        'bluesky-quotes-likes', 'bluesky-quotes-replies', 'bluesky-quotes-reposts',
+        'bluesky-replies-likes', 'bluesky-replies-replies', 'bluesky-replies-reposts',
+        'bluesky-reposts-likes', 'bluesky-reposts-replies', 'bluesky-reposts-reposts'
+    ]
 
     # Datasets by task.
     multiclass_classification_datasets_names = [
@@ -44,7 +50,10 @@ class Dataset:
         'tolokers-2', 'artnet-exp', 'city-reviews', 'web-fraud', 'minesweeper', 'tolokers', 'questions',
     ]
     regression_datasets_names = [
-        'hm-prices', 'avazu-ctr', 'artnet-views', 'twitch-views', 'city-roads-M', 'city-roads-L', 'web-traffic'
+        'hm-prices', 'avazu-ctr', 'artnet-views', 'twitch-views', 'city-roads-M', 'city-roads-L', 'web-traffic',
+        'bluesky-quotes-likes', 'bluesky-quotes-replies', 'bluesky-quotes-reposts',
+        'bluesky-replies-likes', 'bluesky-replies-replies', 'bluesky-replies-reposts',
+        'bluesky-reposts-likes', 'bluesky-reposts-replies', 'bluesky-reposts-reposts'
     ]
 
     # Not all datasets obtained from PyG have predefined data splits. Random class stratified splits will be used for
@@ -91,18 +100,30 @@ class Dataset:
                 name=name, add_self_loops=add_self_loops, node_embeddings_name=node_embeddings
             )
             numerical_features_mask, fraction_features_mask = None, None
+            transductive = True
 
         elif name in self.ogb_datasets_names:
             graph, features, targets, train_mask, val_mask, test_mask = self.get_ogb_dataset(
                 name=name, add_self_loops=add_self_loops, node_embeddings_name=node_embeddings
             )
             numerical_features_mask, fraction_features_mask = None, None
+            transductive = True
 
         elif name == 'amazon-ratings-full':
             graph, features, targets, train_mask, val_mask, test_mask = self.get_amazon_ratings_full_dataset(
                 add_self_loops=add_self_loops, node_embeddings_name=node_embeddings
             )
             numerical_features_mask, fraction_features_mask = None, None
+            transductive = True
+
+        elif name in self.bluesky_datasets_names:
+            (train_graph, train_features, train_targets, train_mask,
+             val_graph, val_features, val_targets, val_mask,
+             test_graph, test_features, test_targets, test_mask) = \
+                self.get_bluesky_dataset(name=name, add_self_loops=add_self_loops)
+
+            numerical_features_mask, fraction_features_mask = None, None
+            transductive = False
 
         else:
             raise ValueError(f'Unkown dataset name: {name}.')
@@ -734,6 +755,51 @@ class Dataset:
         test_mask = (torch.tensor(split_masks['test_mask']) & labeled_mask)
 
         return graph, features, targets, train_mask, val_mask, test_mask
+
+    @staticmethod
+    def get_bluesky_dataset(name, add_self_loops):
+        _, interactions_name, targets_name = name.split('-')
+
+        if targets_name == 'likes':
+            targets_col_idx = 0
+        elif targets_name == 'replies':
+            targets_col_idx = 1
+        elif targets_name == 'reposts':
+            targets_col_idx = 2
+        else:
+            raise ValueError(f'Unkown targets name: {targets_name}.')
+
+        dataset = GraphBenchLoader(dataset_names='bluesky_' + interactions_name, root='data').load()[0]
+
+        train_pyg_data = dataset['train'][0]
+        train_features = train_pyg_data.x
+        train_targets = train_pyg_data.y[:, targets_col_idx]
+        train_num_nodes = len(train_features)
+        train_mask = torch.ones(train_num_nodes, dtype=torch.bool)
+        train_edges = train_pyg_data.edge_index.T
+        train_graph = Dataset.get_graph(edges=train_edges, num_nodes=train_num_nodes, add_self_loops=add_self_loops)
+
+        val_pyg_data = dataset['valid'][0]
+        val_features = val_pyg_data.x
+        val_targets = val_pyg_data.y[:, targets_col_idx]
+        val_num_nodes = len(val_features)
+        val_mask = torch.ones(val_num_nodes, dtype=torch.bool)
+        val_edges = val_pyg_data.edge_index.T
+        val_graph = Dataset.get_graph(edges=val_edges, num_nodes=val_num_nodes, add_self_loops=add_self_loops)
+
+        test_pyg_data = dataset['test'][0]
+        test_features = test_pyg_data.x
+        test_targets = test_pyg_data.y[:, targets_col_idx]
+        test_num_nodes = len(test_features)
+        test_mask = torch.ones(test_num_nodes, dtype=torch.bool)
+        test_edges = test_pyg_data.edge_index.T
+        test_graph = Dataset.get_graph(edges=test_edges, num_nodes=test_num_nodes, add_self_loops=add_self_loops)
+
+        return (
+            train_graph, train_features, train_targets, train_mask,
+            val_graph, val_features, val_targets, val_mask,
+            test_graph, test_features, test_targets, test_mask
+        )
 
     @staticmethod
     def get_graph(edges, num_nodes, add_self_loops):
