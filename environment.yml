@@ -13,9 +13,11 @@ dependencies:
   - numpy=1.26
   - pandas=2.2
   - scikit-learn=1.5
+  - mkl=2023.1
   - pytorch=2.5.1
   - pytorch-cuda=12.4
   - torchdata=0.7
+  - torchtriton=3.1
   - dgl=2.4
   - pip:
       - optuna==4.3
